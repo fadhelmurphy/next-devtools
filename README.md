@@ -40,9 +40,26 @@ Not supported: React Native / Expo, standalone Vite or CRA apps (this package ho
 
 ## Install
 
+### Quick setup (one command)
+
+Run inside your Next.js project:
+
 ```bash
-npm i -D @fadhelmurphy/next-devtools
+npx github:fadhelmurphy/next-devtools init
 ```
+
+It installs the package from this repo with your package manager (npm, pnpm, yarn or bun, picked from your lockfile), wraps `next.config` with `withNextDevtools()`, and adds `<NextDevtools />` to `app/layout` and/or `pages/_app`. Running it twice changes nothing. Flags: `--dry-run`, `--no-install`, `--npm` (install from the npm registry once published).
+
+### Manual setup
+
+```bash
+npm i -D github:fadhelmurphy/next-devtools
+# pnpm add -D github:fadhelmurphy/next-devtools
+# yarn add -D github:fadhelmurphy/next-devtools
+# bun add -d github:fadhelmurphy/next-devtools
+```
+
+Installing from GitHub builds the package on your machine (a `prepare` script), which takes about half a minute the first time. Pin a commit or tag with `github:fadhelmurphy/next-devtools#<sha-or-tag>`.
 
 **1. Wrap your Next config**
 
