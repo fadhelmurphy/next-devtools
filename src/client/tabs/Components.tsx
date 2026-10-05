@@ -14,7 +14,8 @@ import {
   walkTree,
   type TreeNode,
 } from "../fiber.js";
-import { IconChevron, IconInspect, IconRefresh } from "../icons.js";
+import { IconChevron, IconInspect, IconOpen, IconRefresh } from "../icons.js";
+import { ProjectComponents } from "./ProjectComponents.js";
 import { hideHighlight, highlight } from "../overlay.js";
 import { updateSettings } from "../settings.js";
 
@@ -25,8 +26,8 @@ interface Indexed {
 
 const MAX_ROWS = 4000;
 
-export function Components() {
-  const { pendingReveal, clearReveal, startPick, picking } = useDevtools();
+function RuntimeTree({ mode }: { mode: React.ReactNode }) {
+  const { pendingReveal, clearReveal, startPick, picking, open } = useDevtools();
   const { hideInternals } = useSettings();
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
@@ -124,6 +125,7 @@ export function Components() {
   return (
     <div className="nd-split">
       <section className="nd-pane" aria-label="Component tree">
+        <div className="nd-pane-bar">{mode}</div>
         <div className="nd-pane-bar">
           <input className="nd-input" placeholder="Find component" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Find component" />
           <button
@@ -172,7 +174,8 @@ export function Components() {
               className={`nd-tree-row${matches.has(node.id) ? " nd-tree-match" : ""}`}
               style={{ paddingLeft: 8 + depth * 14 }}
               onClick={() => setSelected(node.id)}
-              onDoubleClick={() => node.children.length && toggle(node.id)}
+              onDoubleClick={() => open(sourceOfNode(node))}
+              title="Double-click to open in editor"
               onMouseEnter={() => highlight(nodeElements(node), { title: node.name, server: node.kind === "server" })}
             >
               {node.children.length ? (
@@ -193,6 +196,17 @@ export function Components() {
               <span className="nd-tree-name">{node.name}</span>
               {node.key != null && <span className="nd-tree-key">key="{String(node.key)}"</span>}
               {node.kind === "server" && <span className="nd-badge nd-badge-server">Server</span>}
+              <button
+                className="nd-row-action"
+                aria-label={`Open ${node.name} in editor`}
+                title="Open in editor"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  open(sourceOfNode(node));
+                }}
+              >
+                <IconOpen />
+              </button>
             </div>
           ))}
           {rows.length >= MAX_ROWS && <div className="nd-faint" style={{ padding: "8px 14px" }}>Showing the first {MAX_ROWS} components. Use search to narrow down.</div>}
@@ -214,6 +228,7 @@ const NoSelection = () => (
 );
 
 function Details({ item, onSelect }: { item: Indexed; onSelect: (id: number) => void }) {
+  const { open } = useDevtools();
   const { node, parents } = item;
   const source = sourceOfNode(node);
   const props = propsOf(node);
@@ -238,7 +253,16 @@ function Details({ item, onSelect }: { item: Indexed; onSelect: (id: number) => 
         </span>
       </h3>
       <div style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        {source ? <FileLink loc={source} /> : <span className="nd-faint">Source unknown — it renders no DOM of its own</span>}
+        {source ? (
+          <>
+            <button className="nd-btn nd-btn-primary" onClick={() => open(source)}>
+              <IconOpen /> Open in editor
+            </button>
+            <FileLink loc={source} />
+          </>
+        ) : (
+          <span className="nd-faint">Source unknown — it renders no DOM of its own</span>
+        )}
         {elements.length > 0 && (
           <button className="nd-link" onClick={() => elements[0].scrollIntoView({ block: "center", behavior: "smooth" })}>
             Scroll to
@@ -293,4 +317,15 @@ function Details({ item, onSelect }: { item: Indexed; onSelect: (id: number) => 
       </div>
     </div>
   );
+}
+
+export function Components() {
+  const [mode, setMode] = useState<"page" | "project">("page");
+  const switcher = (
+    <div className="nd-seg" role="group" aria-label="Components view">
+      <button aria-pressed={mode === "page"} onClick={() => setMode("page")}>On this page</button>
+      <button aria-pressed={mode === "project"} onClick={() => setMode("project")}>All in project</button>
+    </div>
+  );
+  return mode === "page" ? <RuntimeTree mode={switcher} /> : <ProjectComponents mode={switcher} />;
 }

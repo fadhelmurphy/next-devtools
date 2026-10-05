@@ -14,11 +14,15 @@ Works with the **App Router and Pages Router**, **Turbopack and webpack**. Teste
 
 | | |
 |---|---|
+| **Overview** | Project at a glance: Next/React/Node versions, bundler, counts for pages, components, API routes, packages and assets (each opens its tab), an update badge when a newer Next.js is out, and the layouts + page that render the current URL. |
 | **Inspector** | Hover anything on the page: component name, Server/Client, file and line, size. Click opens the file in your editor at that line. Shift + click keeps inspecting. |
-| **Components** | Live component tree, including **Server Components** (React 19). Props, `useState` values, the file each component lives in. Pick an element on the page to jump to its component. Next.js internals hidden by default. |
+| **Components** | *On this page*: the live tree including **Server Components** (React 19), with props, `useState` values and an Open in editor button (or double-click a row). *All in project*: every component file, whether it renders on the server or client, its role (page, layout, loading…), which files import it, and which ones are on the current page. |
 | **Routes** | Every page and API route from `app/` and `pages/`: route groups, dynamic, catch-all, parallel and intercepting routes. Fill in params and visit; the current route is highlighted. |
-| **Overview** | Next/React/Node/TypeScript versions, bundler, which layouts and page render the current URL, middleware / proxy, `NEXT_PUBLIC_*` variables, dependencies. |
 | **Assets** | Everything in `public/` with previews, sizes, copy-URL. |
+| **Packages** | Dependencies with installed and latest versions from the npm registry, major/minor/patch badges and a copyable upgrade command. |
+| **Config** | Your resolved `next.config` (functions and regexes shown readably) and the `.env*` files Next loaded — `NEXT_PUBLIC_*` values shown, server-only values hidden. |
+| **Payload** | Current route, `params` and `searchParams`. Pages Router: `__NEXT_DATA__` / `pageProps`. App Router: props your Server Components received and the size of the inlined RSC payload. |
+| **Network** | Requests made from the browser while you use the app, labelled RSC, Server Action (with action id and arguments), API route, fetch or external, plus client navigations. Headers, request body and JSON responses. |
 | **Performance** | LCP, INP, CLS, FCP, TTFB for the page load, document load phases, resources by type. |
 
 ## Requirements
@@ -151,7 +155,9 @@ export default withNextDevtools(nextConfig, {
 
 **"Port belongs to another project"** — two Next apps are running with DevTools on the same port. Give one of them a different `port`.
 
-**Open in editor does nothing** — set `LAUNCH_EDITOR=code` (or `cursor`, `webstorm`, `zed`…) in your shell, pass `editor`, or choose a URL scheme in Settings.
+**Open in editor does nothing** — DevTools looks for a running editor, then for `code`, `cursor`, `windsurf`, `zed`, `webstorm`, `idea` or `subl` on your `PATH`. If none is found it falls back to a `vscode://` link (the browser may ask for permission the first time) and says so in a toast. To pin one, set `LAUNCH_EDITOR=code` (or `cursor`…) before `next dev`, pass `editor`, or choose an editor in Settings. Terminal editors from `$EDITOR` (vim, nano…) are never picked automatically.
+
+**WSL** — run `next dev` inside WSL and the browser on Windows as usual. With the VS Code / Cursor `code` command on your WSL `PATH` files open directly. Otherwise the `vscode://` fallback opens `/mnt/c/…` projects as Windows paths and projects inside the Linux filesystem through the WSL remote (`vscode-remote/wsl+<distro>`).
 
 **A Turbopack rule for `*.tsx` already exists (Next 14/15)** — older Next versions allow one rule per glob, so DevTools skips the inspector for those files and warns. Next 16 merges rules.
 

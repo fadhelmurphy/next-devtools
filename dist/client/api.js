@@ -1,9 +1,13 @@
-import { TOKEN_HEADER } from "../shared/types.js";
+import { TOKEN_HEADER, } from "../shared/types.js";
 import { getSettings } from "./settings.js";
 const PORT = process.env.NEXT_DEVTOOLS_PORT;
 const TOKEN = process.env.NEXT_DEVTOOLS_TOKEN;
 export const PROJECT_ROOT = process.env.NEXT_DEVTOOLS_ROOT;
 export const configured = !!(PORT && TOKEN);
+/** Base URL of the local API — the network tab hides requests to it. */
+export const API_ORIGIN = PORT ? `http://127.0.0.1:${PORT}` : null;
+/** The page's own fetch, captured before the network tab wraps it. */
+const nativeFetch = typeof window !== "undefined" ? window.fetch.bind(window) : fetch;
 export class ApiError extends Error {
     constructor(message, reason) {
         super(message);
@@ -16,7 +20,7 @@ async function request(path, init) {
     }
     let res;
     try {
-        res = await fetch(`http://127.0.0.1:${PORT}${path}`, {
+        res = await nativeFetch(`${API_ORIGIN}${path}`, {
             ...init,
             headers: { "content-type": "application/json", [TOKEN_HEADER]: TOKEN, ...(init?.headers || {}) },
         });
@@ -46,6 +50,10 @@ export const api = {
     info: (fresh) => cached("info", () => request("/info"), fresh),
     routes: (fresh) => cached("routes", () => request("/routes"), fresh),
     assets: (fresh) => cached("assets", () => request("/assets"), fresh),
+    components: (fresh) => cached("components", () => request("/components"), fresh),
+    packages: (fresh) => cached("packages", () => request("/packages"), fresh),
+    packagesLatest: (fresh) => cached("packages-latest", () => request("/packages?latest=1"), fresh),
+    config: (fresh) => cached("config", () => request("/config"), fresh),
 };
 export function parseSource(value) {
     if (!value)
@@ -55,35 +63,44 @@ export function parseSource(value) {
         return { file: value, line: 1, column: 1 };
     return { file: m[1], line: Number(m[2]), column: Number(m[3]) };
 }
-const URL_SCHEMES = {
-    vscode: "vscode://file/{abs}:{line}:{column}",
-    cursor: "cursor://file/{abs}:{line}:{column}",
-    windsurf: "windsurf://file/{abs}:{line}:{column}",
-    zed: "zed://file/{abs}:{line}:{column}",
-    webstorm: "webstorm://open?file={abs}&line={line}&column={column}",
-};
 /** Open a project file in the editor. Returns a short status message for a toast. */
 export async function openInEditor(loc) {
     const { editor } = getSettings();
+    let hints;
+    let why = "";
     if (editor === "server") {
         try {
-            await request("/open-in-editor", { method: "POST", body: JSON.stringify(loc) });
-            return `Opened ${loc.file}:${loc.line}`;
+            const r = await request("/open-in-editor", { method: "POST", body: JSON.stringify(loc) });
+            if (r.ok)
+                return `Opened ${loc.file}:${loc.line}${r.editor ? ` in ${r.editor}` : ""}`;
+            hints = r;
+            why = r.reason ?? "";
         }
         catch (e) {
-            if (!PROJECT_ROOT)
-                return e.message;
-            // fall through to the URL scheme
+            why = e.message;
         }
     }
-    const scheme = URL_SCHEMES[editor === "server" ? "vscode" : editor] ?? URL_SCHEMES.vscode;
     if (!PROJECT_ROOT)
-        return "Project root unknown — wrap next.config with withNextDevtools().";
-    const abs = `${PROJECT_ROOT.replace(/\\/g, "/").replace(/\/$/, "")}/${loc.file}`;
-    const url = scheme
-        .replace("{abs}", abs.startsWith("/") ? abs.slice(1) : abs)
-        .replace("{line}", String(loc.line))
-        .replace("{column}", String(loc.column));
-    window.location.href = url.replace("file//", "file/");
-    return `Opening ${loc.file}:${loc.line}`;
+        return why || "Project root unknown — wrap next.config with withNextDevtools().";
+    const scheme = editor === "server" ? "vscode" : editor;
+    const url = editorUrl(scheme, `${PROJECT_ROOT.replace(/\\/g, "/").replace(/\/$/, "")}/${loc.file}`, loc, hints);
+    window.location.href = url;
+    return editor === "server"
+        ? `No editor CLI found, so opening via ${scheme}://. Set LAUNCH_EDITOR=code (or cursor…) to open directly.`
+        : `Opening ${loc.file}:${loc.line} in ${scheme}`;
+}
+/** Build an editor URL, translating WSL paths so a Windows editor can open them. */
+export function editorUrl(scheme, abs, loc, hints) {
+    const { line, column } = loc;
+    const vscodeLike = scheme === "vscode" || scheme === "cursor" || scheme === "windsurf";
+    if (hints?.wsl && !hints.windowsPath && vscodeLike) {
+        // File lives inside the Linux filesystem: open it through the WSL remote.
+        return `${scheme}://vscode-remote/wsl+${encodeURIComponent(hints.wsl)}${abs}:${line}:${column}`;
+    }
+    const drive = abs.match(/^\/mnt\/([a-z])\/(.*)$/i);
+    const target = hints?.windowsPath ?? (drive ? `${drive[1].toUpperCase()}:/${drive[2]}` : abs);
+    const pathPart = target.startsWith("/") ? target.slice(1) : target;
+    if (scheme === "webstorm")
+        return `webstorm://open?file=${encodeURIComponent(target)}&line=${line}&column=${column}`;
+    return `${scheme}://file/${pathPart}:${line}:${column}`;
 }

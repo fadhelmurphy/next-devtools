@@ -50,3 +50,20 @@ export function navigate(url) {
     }
     window.location.assign(url);
 }
+/** Extract dynamic params of `route` from `pathname`, e.g. /blog/[slug] + /blog/hi → { slug: "hi" }. */
+export function extractParams(route, pathname) {
+    const segs = route.split("/").filter(Boolean);
+    const parts = pathname.split("/").filter(Boolean).map(decodeURIComponent);
+    const out = {};
+    for (let i = 0; i < segs.length; i++) {
+        const m = segs[i].match(/^\[{1,2}(\.\.\.)?([^\]]+)\]{1,2}$/);
+        if (!m)
+            continue;
+        if (m[1]) {
+            out[m[2]] = parts.slice(i);
+            break;
+        }
+        out[m[2]] = parts[i];
+    }
+    return out;
+}

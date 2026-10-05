@@ -101,3 +101,50 @@ export const IconGo = () => (
     <path d="M5 12h13M13 6.5 18.5 12 13 17.5" />
   </Svg>
 );
+
+export const MarkLarge = () => (
+  <svg className="nd-mark-lg" viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="2.5" y="2.5" width="15" height="15" rx="4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    <path d="M7 7.5 10.5 10 7 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M13.2 13.2 21.5 16l-3.6 1.6-1.6 3.7z" fill="var(--accent, #9aa5ff)" stroke="var(--accent, #9aa5ff)" strokeWidth="1.2" strokeLinejoin="round" />
+  </svg>
+);
+export const IconPackages = () => (
+  <Svg>
+    <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z" />
+    <path d="m4 7.5 8 4.5 8-4.5M12 12v9" />
+  </Svg>
+);
+export const IconApi = () => (
+  <Svg>
+    <path d="M8 4.5c-2 0-2.5 1-2.5 3v2c0 1.2-.8 2-2 2.5 1.2.5 2 1.3 2 2.5v2c0 2 .5 3 2.5 3M16 4.5c2 0 2.5 1 2.5 3v2c0 1.2.8 2 2 2.5-1.2.5-2 1.3-2 2.5v2c0 2-.5 3-2.5 3" />
+  </Svg>
+);
+export const IconConfig = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2 5.5 5.5" />
+  </Svg>
+);
+export const IconPayload = () => (
+  <Svg>
+    <ellipse cx="12" cy="6" rx="7.5" ry="3" />
+    <path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6" />
+  </Svg>
+);
+export const IconNetwork = () => (
+  <Svg>
+    <path d="M7 4v14M3.5 14.5 7 18l3.5-3.5M17 20V6M13.5 9.5 17 6l3.5 3.5" />
+  </Svg>
+);
+export const IconMoon = () => (
+  <Svg>
+    <path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z" />
+  </Svg>
+);
+export const IconSun = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2.5v2M12 19.5v2M21.5 12h-2M4.5 12h-2M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4M18.7 18.7l-1.4-1.4M6.7 6.7 5.3 5.3" />
+  </Svg>
+);

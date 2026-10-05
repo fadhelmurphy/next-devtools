@@ -2,6 +2,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { getOrCreateToken, startDevtoolsServer } from "./server";
+import { rememberConfig } from "./runtime-config";
 
 // next.config may be a plain object, a function, or an async function.
 type NextConfigObject = Record<string, any>;
@@ -106,6 +107,7 @@ export function withNextDevtools(nextConfig: NextConfigInput = {}, options: Next
       return resolved;
     }
 
+    rememberConfig(resolved);
     const config: NextConfigObject = { ...resolved };
     const root = path.resolve(options.root ?? process.cwd());
     const port = Number(options.port ?? process.env.NEXT_DEVTOOLS_PORT ?? DEFAULT_PORT);

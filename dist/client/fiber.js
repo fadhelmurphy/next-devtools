@@ -99,7 +99,8 @@ function isNextOverlay(f) {
         if (c.tag === 4 /* HostPortal */) {
             const container = c.stateNode?.containerInfo;
             const hostEl = container instanceof ShadowRoot ? container.host : container;
-            return !!hostEl?.closest?.("nextjs-portal") || hostEl?.tagName === "NEXTJS-PORTAL";
+            // Next's error overlay and the Pages Router's route announcer
+            return !!hostEl?.closest?.("nextjs-portal, next-route-announcer");
         }
     }
     return false;

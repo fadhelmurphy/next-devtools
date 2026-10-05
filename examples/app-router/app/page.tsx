@@ -1,5 +1,6 @@
 import { Counter } from "@/components/Counter";
 import { ProductCard } from "@/components/ProductCard";
+import { HelloButton } from "@/components/HelloButton";
 
 const products = [
   { id: 1, name: "Trail shoes", price: 129 },
@@ -12,6 +13,7 @@ export default async function Home() {
       <h1>Home</h1>
       <p>This page is a Server Component that renders a client counter.</p>
       <Counter initial={3} />
+      <HelloButton />
       {products.map((p) => (
         <ProductCard key={p.id} product={p} />
       ))}

@@ -40,17 +40,16 @@ var getImportMetaUrl = () => typeof document === "undefined" ? new URL(`file:${_
 var importMetaUrl = /* @__PURE__ */ getImportMetaUrl();
 
 // src/config/index.ts
-var import_node_path4 = __toESM(require("path"), 1);
-var import_node_module2 = require("module");
+var import_node_path8 = __toESM(require("path"), 1);
+var import_node_module5 = require("module");
 var import_node_url = require("url");
 
 // src/config/server.ts
 var import_node_http = __toESM(require("http"), 1);
-var import_node_fs3 = __toESM(require("fs"), 1);
-var import_node_os = __toESM(require("os"), 1);
-var import_node_path3 = __toESM(require("path"), 1);
+var import_node_fs6 = __toESM(require("fs"), 1);
+var import_node_os2 = __toESM(require("os"), 1);
+var import_node_path7 = __toESM(require("path"), 1);
 var import_node_crypto = __toESM(require("crypto"), 1);
-var import_launch_editor = __toESM(require("launch-editor"), 1);
 
 // src/shared/types.ts
 var TOKEN_HEADER = "x-next-devtools-token";
@@ -203,8 +202,8 @@ function readJson(file) {
 }
 function installedVersion(root, pkg) {
   try {
-    const req = (0, import_node_module.createRequire)(import_node_path2.default.join(root, "package.json"));
-    return readJson(req.resolve(`${pkg}/package.json`))?.version;
+    const req2 = (0, import_node_module.createRequire)(import_node_path2.default.join(root, "package.json"));
+    return readJson(req2.resolve(`${pkg}/package.json`))?.version;
   } catch {
     return void 0;
   }
@@ -311,70 +310,426 @@ function scanAssets(root, limit = 2e3) {
   return out.sort((a, b) => a.path.localeCompare(b.path));
 }
 
+// src/config/editor.ts
+var import_node_fs3 = __toESM(require("fs"), 1);
+var import_node_os = __toESM(require("os"), 1);
+var import_node_path3 = __toESM(require("path"), 1);
+var import_node_module2 = require("module");
+var import_launch_editor = __toESM(require("launch-editor"), 1);
+var req = (0, import_node_module2.createRequire)(typeof __filename !== "undefined" ? __filename : importMetaUrl);
+var PATH_EDITORS = ["code", "cursor", "windsurf", "code-insiders", "zed", "webstorm", "idea", "subl"];
+var TERMINAL_EDITORS = /^(vi|vim|nvim|nano|emacs|ed|micro|hx|helix|joe|less|more)$/;
+function wslDistro() {
+  if (process.platform !== "linux") return void 0;
+  if (process.env.WSL_DISTRO_NAME) return process.env.WSL_DISTRO_NAME;
+  return /microsoft/i.test(import_node_os.default.release()) ? "WSL" : void 0;
+}
+function windowsPathOf(abs) {
+  const m = abs.match(/^\/mnt\/([a-z])\/(.*)$/i);
+  return m ? `${m[1].toUpperCase()}:/${m[2]}` : void 0;
+}
+function onPath(cmd) {
+  const exts = process.platform === "win32" ? ["", ".cmd", ".exe", ".bat"] : [""];
+  for (const dir of (process.env.PATH || "").split(import_node_path3.default.delimiter)) {
+    if (!dir) continue;
+    for (const ext of exts) {
+      try {
+        if (import_node_fs3.default.statSync(import_node_path3.default.join(dir, cmd + ext)).isFile()) return true;
+      } catch {
+      }
+    }
+  }
+  return false;
+}
+function resolveEditor(specified) {
+  if (specified) return specified;
+  if (process.env.LAUNCH_EDITOR) return process.env.LAUNCH_EDITOR;
+  try {
+    const guess = req("launch-editor/guess");
+    const [found] = guess();
+    if (found && !TERMINAL_EDITORS.test(import_node_path3.default.basename(found))) return found;
+  } catch {
+  }
+  return PATH_EDITORS.find(onPath) ?? null;
+}
+function openInEditor(abs, line, column, specified) {
+  const hints = { wsl: wslDistro(), windowsPath: windowsPathOf(abs) };
+  const editor = resolveEditor(specified);
+  if (!editor) {
+    return Promise.resolve({
+      ok: false,
+      reason: "No editor found. Set LAUNCH_EDITOR (e.g. code, cursor) or pass `editor` to withNextDevtools().",
+      ...hints
+    });
+  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (r) => {
+      if (!settled) {
+        settled = true;
+        resolve(r);
+      }
+    };
+    (0, import_launch_editor.default)(`${abs}:${line}:${column}`, editor, (_file, msg) => {
+      const reason = msg || `Could not run "${editor}".`;
+      console.warn(`[next-devtools] ${reason}`);
+      done({ ok: false, editor, reason, ...hints });
+    });
+    setTimeout(() => done({ ok: true, editor, ...hints }), 400);
+  });
+}
+
+// src/config/components.ts
+var import_node_fs4 = __toESM(require("fs"), 1);
+var import_node_path4 = __toESM(require("path"), 1);
+var toPosix3 = (p) => p.split(import_node_path4.default.sep).join("/");
+var SKIP_DIRS = /* @__PURE__ */ new Set(["node_modules", ".next", ".git", "public", "dist", "out", "build", "coverage", ".turbo", ".vercel", "storybook-static"]);
+var EXT_RE = /\.(tsx|jsx|js|mjs)$/;
+var MAX_FILES = 3e3;
+var MAX_SIZE = 300 * 1024;
+var APP_SPECIAL = /^(page|layout|template|loading|error|global-error|not-found|forbidden|unauthorized|default)$/;
+function stripJsonc(src) {
+  let out = "";
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '"') {
+      let j = i + 1;
+      while (j < src.length && src[j] !== '"') j += src[j] === "\\" ? 2 : 1;
+      out += src.slice(i, j + 1);
+      i = j;
+    } else if (ch === "/" && src[i + 1] === "/") {
+      while (i < src.length && src[i] !== "\n") i++;
+      out += "\n";
+    } else if (ch === "/" && src[i + 1] === "*") {
+      i = src.indexOf("*/", i + 2);
+      if (i === -1) break;
+      i++;
+    } else out += ch;
+  }
+  return out.replace(/,(\s*[}\]])/g, "$1");
+}
+function readTsPaths(root) {
+  for (const name of ["tsconfig.json", "jsconfig.json"]) {
+    try {
+      const raw = stripJsonc(import_node_fs4.default.readFileSync(import_node_path4.default.join(root, name), "utf8"));
+      const co = JSON.parse(raw).compilerOptions ?? {};
+      return { baseUrl: import_node_path4.default.resolve(root, co.baseUrl ?? "."), paths: co.paths ?? {} };
+    } catch {
+    }
+  }
+  return { baseUrl: root, paths: {} };
+}
+function resolveImport(spec, fromFile, ts, known) {
+  let bases = [];
+  if (spec.startsWith(".")) bases = [import_node_path4.default.resolve(import_node_path4.default.dirname(fromFile), spec)];
+  else {
+    for (const [pattern, targets] of Object.entries(ts.paths)) {
+      const prefix = pattern.replace(/\*$/, "");
+      if (pattern.endsWith("*") ? spec.startsWith(prefix) : spec === pattern) {
+        const rest = pattern.endsWith("*") ? spec.slice(prefix.length) : "";
+        bases.push(...targets.map((t) => import_node_path4.default.resolve(ts.baseUrl, t.replace(/\*$/, rest))));
+      }
+    }
+  }
+  for (const base of bases) {
+    for (const cand of [base, ...["tsx", "ts", "jsx", "js", "mjs"].flatMap((e) => [`${base}.${e}`, import_node_path4.default.join(base, `index.${e}`)])]) {
+      if (known.has(cand)) return cand;
+    }
+  }
+  return null;
+}
+function exportedComponents(code, file) {
+  const names = /* @__PURE__ */ new Set();
+  const patterns = [
+    /export\s+default\s+(?:async\s+)?function\s+([A-Z]\w*)/g,
+    /export\s+(?:async\s+)?function\s+([A-Z]\w*)/g,
+    /export\s+const\s+([A-Z]\w*)\s*(?::[^=]+)?=\s*(?:React\.)?(?:memo|forwardRef|async|\(|function)/g,
+    /export\s+class\s+([A-Z]\w*)\s+extends\s+(?:React\.)?(?:Pure)?Component/g,
+    /export\s+default\s+([A-Z]\w*)\s*;?\s*$/gm,
+    /export\s*\{([^}]+)\}/g
+  ];
+  for (const re of patterns) {
+    for (const m of code.matchAll(re)) {
+      if (re.source.startsWith("export\\s*\\{")) {
+        for (const part of m[1].split(",")) {
+          const n = part.trim().split(/\s+as\s+/).pop()?.trim();
+          if (n && /^[A-Z]\w*$/.test(n)) names.add(n);
+        }
+      } else names.add(m[1]);
+    }
+  }
+  if (!names.size && /export\s+default\s+(?:async\s+)?(?:function\s*\(|\(|async\s*\()/.test(code)) {
+    const base = import_node_path4.default.basename(file).replace(EXT_RE, "");
+    names.add(base === "index" ? import_node_path4.default.basename(import_node_path4.default.dirname(file)) : base);
+  }
+  return [...names];
+}
+function scanComponents(root, appDir, pagesDir) {
+  const files = [];
+  const walk = (dir) => {
+    let entries = [];
+    try {
+      entries = import_node_fs4.default.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (files.length >= MAX_FILES) return;
+      if (e.name.startsWith(".") && e.name !== ".storybook") continue;
+      const full = import_node_path4.default.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (!SKIP_DIRS.has(e.name)) walk(full);
+      } else if (EXT_RE.test(e.name) && !/\.(test|spec|stories|d)\./.test(e.name) && !/^next\.config\./.test(e.name)) {
+        files.push(full);
+      }
+    }
+  };
+  walk(root);
+  const known = new Set(files);
+  const ts = readTsPaths(root);
+  const sources = /* @__PURE__ */ new Map();
+  for (const f of files) {
+    try {
+      if (import_node_fs4.default.statSync(f).size <= MAX_SIZE) sources.set(f, import_node_fs4.default.readFileSync(f, "utf8"));
+    } catch {
+    }
+  }
+  const usedBy = /* @__PURE__ */ new Map();
+  const importRe = /(?:import|export)\s[^'"]*?from\s*["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/g;
+  for (const [file, code] of sources) {
+    for (const m of code.matchAll(importRe)) {
+      const spec = m[1] || m[2];
+      if (!spec || !spec.startsWith(".") && !Object.keys(ts.paths).length) continue;
+      const target = resolveImport(spec, file, ts, known);
+      if (target && target !== file) {
+        if (!usedBy.has(target)) usedBy.set(target, /* @__PURE__ */ new Set());
+        usedBy.get(target).add(toPosix3(import_node_path4.default.relative(root, file)));
+      }
+    }
+  }
+  const out = [];
+  for (const [file, code] of sources) {
+    if (!/<[A-Za-z][\w.]*[\s/>]/.test(code) || !/return|=>/.test(code)) continue;
+    const names = exportedComponents(code, file);
+    if (!names.length) continue;
+    const head = code.slice(0, 400).replace(/^\s*(\/\/.*\n|\/\*[\s\S]*?\*\/\s*)*/, "");
+    const directive = head.match(/^["']use (client|server)["']/)?.[1];
+    const inApp = !!appDir && file.startsWith(appDir + import_node_path4.default.sep);
+    const inPages = !!pagesDir && file.startsWith(pagesDir + import_node_path4.default.sep);
+    const base = import_node_path4.default.basename(file).replace(EXT_RE, "");
+    const role = inApp && APP_SPECIAL.test(base) ? base : inPages ? base.startsWith("_") ? "pages-special" : "page" : "component";
+    out.push({
+      file: toPosix3(import_node_path4.default.relative(root, file)),
+      names,
+      directive: directive === "client" ? "client" : directive === "server" ? "server" : void 0,
+      // In the App Router, files without "use client" render on the server unless a client file imports them.
+      runtime: directive === "client" || inPages ? "client" : inApp ? "server" : "shared",
+      role,
+      usedBy: [...usedBy.get(file) ?? []].sort(),
+      lines: code.split("\n").length
+    });
+  }
+  return out.sort((a, b) => a.file.localeCompare(b.file));
+}
+
+// src/config/packages.ts
+var import_node_fs5 = __toESM(require("fs"), 1);
+var import_node_path5 = __toESM(require("path"), 1);
+var import_node_module3 = require("module");
+var latestCache = /* @__PURE__ */ new Map();
+var TTL = 30 * 60 * 1e3;
+function readJson2(file) {
+  try {
+    return JSON.parse(import_node_fs5.default.readFileSync(file, "utf8"));
+  } catch {
+    return void 0;
+  }
+}
+function installedVersion2(root, name) {
+  const direct = readJson2(import_node_path5.default.join(root, "node_modules", name, "package.json"))?.version;
+  if (direct) return direct;
+  try {
+    return readJson2((0, import_node_module3.createRequire)(import_node_path5.default.join(root, "package.json")).resolve(`${name}/package.json`))?.version;
+  } catch {
+    return void 0;
+  }
+}
+var parse = (v) => (v ?? "").replace(/^[^\d]*/, "").split(/[.+-]/).slice(0, 3).map((n) => Number(n) || 0);
+function updateType(installed, latest) {
+  if (!installed || !latest) return void 0;
+  const [a, b, c] = parse(installed);
+  const [x, y, z] = parse(latest);
+  if (x > a) return "major";
+  if (x === a && y > b) return "minor";
+  if (x === a && y === b && z > c) return "patch";
+  return void 0;
+}
+async function fetchLatest(name) {
+  const hit = latestCache.get(name);
+  if (hit && Date.now() - hit.at < TTL) return hit.version;
+  let version = null;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5e3);
+    const res = await fetch(`https://registry.npmjs.org/${name.replace("/", "%2F")}/latest`, {
+      signal: ctrl.signal,
+      headers: { accept: "application/json" }
+    });
+    clearTimeout(t);
+    if (res.ok) version = (await res.json()).version ?? null;
+  } catch {
+    version = null;
+  }
+  latestCache.set(name, { version, at: Date.now() });
+  return version;
+}
+async function listPackages(root, withLatest) {
+  const pkg = readJson2(import_node_path5.default.join(root, "package.json")) ?? {};
+  const entries = [];
+  for (const [kind, deps] of [["dependency", pkg.dependencies], ["devDependency", pkg.devDependencies]]) {
+    for (const [name, range] of Object.entries(deps ?? {})) {
+      const local = /^(file|link|workspace|github|git\+|https?):/.test(range) || range.includes("/");
+      entries.push({ name, range, kind, installed: installedVersion2(root, name), source: local ? "external" : "npm" });
+    }
+  }
+  if (withLatest) {
+    const queue = entries.filter((e) => e.source === "npm");
+    let i = 0;
+    await Promise.all(
+      Array.from({ length: 8 }, async () => {
+        while (i < queue.length) {
+          const e = queue[i++];
+          e.latest = await fetchLatest(e.name) ?? void 0;
+          e.update = updateType(e.installed, e.latest);
+        }
+      })
+    );
+  }
+  return entries.sort((a, b) => a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "dependency" ? -1 : 1);
+}
+
+// src/config/runtime-config.ts
+var import_node_path6 = __toESM(require("path"), 1);
+var import_node_module4 = require("module");
+var resolvedConfig = {};
+var HIDDEN_ENV = /^NEXT_DEVTOOLS_/;
+function rememberConfig(config) {
+  resolvedConfig = config;
+}
+function serialize(value, depth = 0, seen = /* @__PURE__ */ new WeakSet()) {
+  if (value === void 0) return "undefined";
+  if (value === null || typeof value !== "object") {
+    if (typeof value === "function") return `\u0192 ${value.name || "anonymous"}()`;
+    if (typeof value === "bigint" || typeof value === "symbol") return String(value);
+    return value;
+  }
+  if (value instanceof RegExp) return value.toString();
+  if (seen.has(value)) return "[Circular]";
+  seen.add(value);
+  if (depth > 8) return Array.isArray(value) ? `Array(${value.length})` : "{\u2026}";
+  if (Array.isArray(value)) return value.map((v) => serialize(v, depth + 1, seen));
+  const out = {};
+  for (const [k, v] of Object.entries(value)) out[k] = serialize(v, depth + 1, seen);
+  return out;
+}
+function parseDotenv(src) {
+  const out = {};
+  for (const line of src.split(/\r?\n/)) {
+    const m = line.match(/^\s*(?:export\s+)?([\w.-]+)\s*=\s*(.*)$/);
+    if (m) out[m[1]] = m[2].replace(/^(['"])(.*)\1$/, "$2");
+  }
+  return out;
+}
+function getConfigSnapshot(root) {
+  const config = serialize(resolvedConfig);
+  if (config.env && typeof config.env === "object") {
+    for (const k of Object.keys(config.env)) if (HIDDEN_ENV.test(k)) delete config.env[k];
+  }
+  const envFiles = [];
+  try {
+    const { loadEnvConfig } = (0, import_node_module4.createRequire)(import_node_path6.default.join(root, "package.json"))("@next/env");
+    const { loadedEnvFiles } = loadEnvConfig(root, true, { info() {
+    }, error() {
+    } }, true);
+    for (const f of loadedEnvFiles ?? []) {
+      envFiles.push({
+        file: f.path,
+        // Only NEXT_PUBLIC_* values are shown — they're in the client bundle anyway.
+        vars: Object.entries(f.env ?? parseDotenv(f.contents ?? "")).map(([key, value]) => ({
+          key,
+          value: key.startsWith("NEXT_PUBLIC_") ? value : void 0
+        }))
+      });
+    }
+  } catch {
+  }
+  return { config, envFiles };
+}
+
 // src/config/server.ts
 var GLOBAL_KEY = /* @__PURE__ */ Symbol.for("next-devtools.server");
 function getOrCreateToken(root) {
   const dirs = [
-    import_node_path3.default.join(root, "node_modules", ".cache", "next-devtools"),
-    import_node_path3.default.join(import_node_os.default.tmpdir(), "next-devtools-" + import_node_crypto.default.createHash("sha1").update(root).digest("hex").slice(0, 12))
+    import_node_path7.default.join(root, "node_modules", ".cache", "next-devtools"),
+    import_node_path7.default.join(import_node_os2.default.tmpdir(), "next-devtools-" + import_node_crypto.default.createHash("sha1").update(root).digest("hex").slice(0, 12))
   ];
   for (const dir of dirs) {
     try {
-      import_node_fs3.default.mkdirSync(dir, { recursive: true });
-      const file = import_node_path3.default.join(dir, "token");
+      import_node_fs6.default.mkdirSync(dir, { recursive: true });
+      const file = import_node_path7.default.join(dir, "token");
       try {
-        const existing = import_node_fs3.default.readFileSync(file, "utf8").trim();
+        const existing = import_node_fs6.default.readFileSync(file, "utf8").trim();
         if (existing) return existing;
       } catch {
       }
       const token = import_node_crypto.default.randomBytes(24).toString("hex");
       try {
-        import_node_fs3.default.writeFileSync(file, token, { flag: "wx", mode: 384 });
+        import_node_fs6.default.writeFileSync(file, token, { flag: "wx", mode: 384 });
         return token;
       } catch {
-        const raced = import_node_fs3.default.readFileSync(file, "utf8").trim();
+        const raced = import_node_fs6.default.readFileSync(file, "utf8").trim();
         if (raced) return raced;
       }
     } catch {
     }
   }
-  return import_node_crypto.default.createHash("sha256").update(root + import_node_os.default.hostname() + import_node_os.default.userInfo().username).digest("hex");
+  return import_node_crypto.default.createHash("sha256").update(root + import_node_os2.default.hostname() + import_node_os2.default.userInfo().username).digest("hex");
 }
 function send(res, status, body) {
   res.statusCode = status;
   res.setHeader("content-type", "application/json; charset=utf-8");
   res.end(JSON.stringify(body));
 }
-function readBody(req) {
+function readBody(req2) {
   return new Promise((resolve) => {
     let data = "";
-    req.on("data", (c) => {
+    req2.on("data", (c) => {
       data += c;
-      if (data.length > 64 * 1024) req.destroy();
+      if (data.length > 64 * 1024) req2.destroy();
     });
-    req.on("end", () => {
+    req2.on("end", () => {
       try {
         resolve(data ? JSON.parse(data) : {});
       } catch {
         resolve({});
       }
     });
-    req.on("error", () => resolve({}));
+    req2.on("error", () => resolve({}));
   });
 }
 function resolveInsideRoot(root, file) {
   if (typeof file !== "string" || !file) return null;
-  const abs = import_node_path3.default.resolve(root, file);
-  const rel = import_node_path3.default.relative(root, abs);
-  if (rel.startsWith("..") || import_node_path3.default.isAbsolute(rel)) return null;
+  const abs = import_node_path7.default.resolve(root, file);
+  const rel = import_node_path7.default.relative(root, abs);
+  if (rel.startsWith("..") || import_node_path7.default.isAbsolute(rel)) return null;
   return abs;
 }
 function startDevtoolsServer(opts) {
   const g = globalThis;
   if (g[GLOBAL_KEY]) return;
   g[GLOBAL_KEY] = true;
-  const server = import_node_http.default.createServer(async (req, res) => {
-    const origin = req.headers.origin;
+  const server = import_node_http.default.createServer(async (req2, res) => {
+    const origin = req2.headers.origin;
     if (origin) {
       res.setHeader("access-control-allow-origin", origin);
       res.setHeader("vary", "origin");
@@ -382,13 +737,13 @@ function startDevtoolsServer(opts) {
     res.setHeader("access-control-allow-headers", `content-type, ${TOKEN_HEADER}`);
     res.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
     res.setHeader("access-control-allow-private-network", "true");
-    if (req.method === "OPTIONS") {
+    if (req2.method === "OPTIONS") {
       res.statusCode = 204;
       return res.end();
     }
-    const url = new URL(req.url || "/", "http://localhost");
-    if (url.pathname === "/ping") return send(res, 200, { ok: true, root: import_node_path3.default.basename(opts.root) });
-    if (req.headers[TOKEN_HEADER] !== opts.token) return send(res, 401, { error: "invalid token" });
+    const url = new URL(req2.url || "/", "http://localhost");
+    if (url.pathname === "/ping") return send(res, 200, { ok: true, root: import_node_path7.default.basename(opts.root) });
+    if (req2.headers[TOKEN_HEADER] !== opts.token) return send(res, 401, { error: "invalid token" });
     try {
       switch (url.pathname) {
         case "/info":
@@ -398,17 +753,22 @@ function startDevtoolsServer(opts) {
         case "/assets":
           return send(res, 200, scanAssets(opts.root));
         case "/open-in-editor": {
-          if (req.method !== "POST") return send(res, 405, { error: "POST only" });
-          const body = await readBody(req);
+          if (req2.method !== "POST") return send(res, 405, { error: "POST only" });
+          const body = await readBody(req2);
           const abs = resolveInsideRoot(opts.root, body.file);
-          if (!abs || !import_node_fs3.default.existsSync(abs)) return send(res, 404, { error: "file not found in project" });
+          if (!abs || !import_node_fs6.default.existsSync(abs)) return send(res, 404, { error: "file not found in project" });
           const line = Math.max(1, Number(body.line) || 1);
           const column = Math.max(1, Number(body.column) || 1);
-          (0, import_launch_editor.default)(`${abs}:${line}:${column}`, opts.editor, (_f, msg) => {
-            console.warn(`[next-devtools] could not open editor: ${msg ?? "unknown error"} \u2014 set LAUNCH_EDITOR or the \`editor\` option`);
-          });
-          return send(res, 200, { ok: true, file: abs });
+          return send(res, 200, await openInEditor(abs, line, column, opts.editor));
         }
+        case "/components": {
+          const { appDir, pagesDir } = resolveRouterDirs(opts.root);
+          return send(res, 200, scanComponents(opts.root, appDir, pagesDir));
+        }
+        case "/packages":
+          return send(res, 200, await listPackages(opts.root, url.searchParams.get("latest") === "1"));
+        case "/config":
+          return send(res, 200, getConfigSnapshot(opts.root));
         default:
           return send(res, 404, { error: "not found" });
       }
@@ -431,11 +791,11 @@ function startDevtoolsServer(opts) {
 // src/config/index.ts
 var PHASE_DEVELOPMENT_SERVER = "phase-development-server";
 var DEFAULT_PORT = 4590;
-var here = typeof __dirname !== "undefined" ? __dirname : import_node_path4.default.dirname((0, import_node_url.fileURLToPath)(importMetaUrl));
-var LOADER_PATH = import_node_path4.default.join(here, "loader.cjs");
+var here = typeof __dirname !== "undefined" ? __dirname : import_node_path8.default.dirname((0, import_node_url.fileURLToPath)(importMetaUrl));
+var LOADER_PATH = import_node_path8.default.join(here, "loader.cjs");
 function nextMajorMinor(root) {
   try {
-    const v = (0, import_node_module2.createRequire)(import_node_path4.default.join(root, "package.json"))("next/package.json").version;
+    const v = (0, import_node_module5.createRequire)(import_node_path8.default.join(root, "package.json"))("next/package.json").version;
     const [maj, min] = v.split(".").map(Number);
     return [maj || 0, min || 0];
   } catch {
@@ -488,8 +848,9 @@ function withNextDevtools(nextConfig = {}, options = {}) {
     if (phase !== PHASE_DEVELOPMENT_SERVER || options.enabled === false || process.env.NEXT_DEVTOOLS === "0") {
       return resolved;
     }
+    rememberConfig(resolved);
     const config = { ...resolved };
-    const root = import_node_path4.default.resolve(options.root ?? process.cwd());
+    const root = import_node_path8.default.resolve(options.root ?? process.cwd());
     const port = Number(options.port ?? process.env.NEXT_DEVTOOLS_PORT ?? DEFAULT_PORT);
     const token = getOrCreateToken(root);
     const pageExtensions = config.pageExtensions ?? ["tsx", "ts", "jsx", "js"];

@@ -6,16 +6,26 @@ import {
   IconAssets,
   IconClose,
   IconComponents,
+  IconConfig,
   IconInspect,
+  IconMoon,
+  IconNetwork,
   IconOverview,
+  IconPackages,
+  IconPayload,
   IconPerformance,
   IconRoutes,
   IconSettings,
+  IconSun,
   Mark,
 } from "./icons.js";
 import { startInspector, stopInspector, type InspectorMode } from "./overlay.js";
 import { updateSettings } from "./settings.js";
 import { Assets } from "./tabs/Assets.js";
+import { Config } from "./tabs/Config.js";
+import { Network } from "./tabs/Network.js";
+import { Packages } from "./tabs/Packages.js";
+import { Payload } from "./tabs/Payload.js";
 import { Components } from "./tabs/Components.js";
 import { Overview } from "./tabs/Overview.js";
 import { Performance } from "./tabs/Performance.js";
@@ -23,14 +33,20 @@ import { Routes } from "./tabs/Routes.js";
 import { SettingsTab } from "./tabs/Settings.js";
 import { getVitals, rate, subscribeVitals } from "./vitals.js";
 
-const TABS: { id: string; label: string; icon: () => ReactNode; render: () => ReactNode; flush?: boolean }[] = [
+type TabDef = { id: string; label: string; icon: () => ReactNode; render: () => ReactNode; flush?: boolean };
+const TABS: TabDef[] = [
   { id: "overview", label: "Overview", icon: IconOverview, render: () => <Overview /> },
   { id: "components", label: "Components", icon: IconComponents, render: () => <Components />, flush: true },
   { id: "routes", label: "Routes", icon: IconRoutes, render: () => <Routes /> },
   { id: "assets", label: "Assets", icon: IconAssets, render: () => <Assets /> },
+  { id: "packages", label: "Packages", icon: IconPackages, render: () => <Packages /> },
+  { id: "config", label: "Config", icon: IconConfig, render: () => <Config /> },
+  { id: "payload", label: "Payload", icon: IconPayload, render: () => <Payload /> },
+  { id: "network", label: "Network", icon: IconNetwork, render: () => <Network />, flush: true },
   { id: "performance", label: "Performance", icon: IconPerformance, render: () => <Performance /> },
-  { id: "settings", label: "Settings", icon: IconSettings, render: () => <SettingsTab /> },
 ];
+const SETTINGS_TAB: TabDef = { id: "settings", label: "Settings", icon: IconSettings, render: () => <SettingsTab /> };
+const ALL_TABS = [...TABS, SETTINGS_TAB];
 
 function usePrefersLight() {
   const [light, set] = useState(() => window.matchMedia?.("(prefers-color-scheme: light)").matches ?? false);
@@ -44,7 +60,7 @@ function usePrefersLight() {
   return light;
 }
 
-const defaultHeight = () => Math.round(Math.min(Math.max(window.innerHeight * 0.48, 320), window.innerHeight - 40));
+const defaultHeight = () => Math.round(Math.min(Math.max(window.innerHeight * 0.55, 360), window.innerHeight - 40));
 
 function LcpChip() {
   const [lcp, setLcp] = useState(() => getVitals().lcp);
@@ -71,7 +87,7 @@ export function App() {
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const open = settings.open;
-  const tab = TABS.find((t) => t.id === settings.tab) ?? TABS[0];
+  const tab = ALL_TABS.find((t) => t.id === settings.tab) ?? TABS[0];
   const setOpen = (v: boolean) => updateSettings({ open: v });
   const setTab = useCallback((id: string) => updateSettings({ tab: id, open: true }), []);
 
@@ -206,6 +222,14 @@ export function App() {
                   Next DevTools
                   <small>{(window as any).next?.version ? `Next.js ${(window as any).next.version}` : "Development"}</small>
                 </div>
+                <button
+                  className="nd-icon-btn nd-theme-btn"
+                  onClick={() => updateSettings({ theme: theme === "dark" ? "light" : "dark" })}
+                  title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+                  aria-label="Toggle theme"
+                >
+                  {theme === "dark" ? <IconMoon /> : <IconSun />}
+                </button>
               </div>
               {TABS.map((t) => (
                 <button key={t.id} className="nd-tab" role="tab" aria-selected={t.id === tab.id} onClick={() => setTab(t.id)}>
@@ -214,6 +238,10 @@ export function App() {
                 </button>
               ))}
               <div className="nd-rail-spacer" />
+              <button className="nd-tab" role="tab" aria-selected={tab.id === "settings"} onClick={() => setTab("settings")}>
+                {SETTINGS_TAB.icon()}
+                <span>{SETTINGS_TAB.label}</span>
+              </button>
             </nav>
             <main className="nd-main">
               <header className="nd-head">

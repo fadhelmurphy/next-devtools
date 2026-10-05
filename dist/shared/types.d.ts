@@ -56,3 +56,42 @@ export interface ProjectInfo {
     devDependencies: Record<string, string>;
     pageExtensions: string[];
 }
+export interface ComponentFile {
+    file: string;
+    /** Exported component names */
+    names: string[];
+    directive?: "client" | "server";
+    /** Where it renders: client ("use client" / Pages Router), server (App Router default) or shared (depends on importer) */
+    runtime: "client" | "server" | "shared";
+    role: "component" | "page" | "pages-special" | "layout" | "template" | "loading" | "error" | "global-error" | "not-found" | "forbidden" | "unauthorized" | "default";
+    /** Files that import this one */
+    usedBy: string[];
+    lines: number;
+}
+export interface PackageEntry {
+    name: string;
+    range: string;
+    kind: "dependency" | "devDependency";
+    installed?: string;
+    latest?: string;
+    update?: "major" | "minor" | "patch";
+    /** npm registry package, or git/file/workspace reference */
+    source: "npm" | "external";
+}
+export interface ConfigSnapshot {
+    config: Record<string, unknown>;
+    envFiles: {
+        file: string;
+        vars: {
+            key: string;
+            value?: string;
+        }[];
+    }[];
+}
+export interface OpenResult {
+    ok: boolean;
+    editor?: string;
+    reason?: string;
+    wsl?: string;
+    windowsPath?: string;
+}

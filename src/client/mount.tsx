@@ -4,6 +4,7 @@ import { HOST_ID } from "./fiber.js";
 import { attachOverlay } from "./overlay.js";
 import { styles } from "./styles.js";
 import { startVitals } from "./vitals.js";
+import { installNetworkRecorder } from "./network.js";
 
 let root: Root | null = null;
 let host: HTMLElement | null = null;
@@ -14,6 +15,7 @@ let host: HTMLElement | null = null;
  */
 export function mount(): () => void {
   startVitals();
+  installNetworkRecorder();
   if (!host || !host.isConnected) {
     host = document.getElementById(HOST_ID) ?? document.createElement("div");
     host.id = HOST_ID;

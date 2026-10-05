@@ -3,10 +3,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
-import launchEditor from "launch-editor";
 import { TOKEN_HEADER } from "../shared/types";
 import { getProjectInfo, scanAssets } from "./project";
-import { scanRoutes } from "./routes";
+import { scanRoutes, resolveRouterDirs } from "./routes";
+import { openInEditor } from "./editor";
+import { scanComponents } from "./components";
+import { listPackages } from "./packages";
+import { getConfigSnapshot } from "./runtime-config";
 
 export interface ServerOptions {
   root: string;
@@ -125,11 +128,16 @@ export function startDevtoolsServer(opts: ServerOptions): void {
           if (!abs || !fs.existsSync(abs)) return send(res, 404, { error: "file not found in project" });
           const line = Math.max(1, Number(body.line) || 1);
           const column = Math.max(1, Number(body.column) || 1);
-          launchEditor(`${abs}:${line}:${column}`, opts.editor, (_f: string, msg?: string | null) => {
-            console.warn(`[next-devtools] could not open editor: ${msg ?? "unknown error"} — set LAUNCH_EDITOR or the \`editor\` option`);
-          });
-          return send(res, 200, { ok: true, file: abs });
+          return send(res, 200, await openInEditor(abs, line, column, opts.editor));
         }
+        case "/components": {
+          const { appDir, pagesDir } = resolveRouterDirs(opts.root);
+          return send(res, 200, scanComponents(opts.root, appDir, pagesDir));
+        }
+        case "/packages":
+          return send(res, 200, await listPackages(opts.root, url.searchParams.get("latest") === "1"));
+        case "/config":
+          return send(res, 200, getConfigSnapshot(opts.root));
         default:
           return send(res, 404, { error: "not found" });
       }
