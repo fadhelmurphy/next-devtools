@@ -155,6 +155,8 @@ export default withNextDevtools(nextConfig, {
 
 **A Turbopack rule for `*.tsx` already exists (Next 14/15)** — older Next versions allow one rule per glob, so DevTools skips the inspector for those files and warns. Next 16 merges rules.
 
+**`tsup: not found` / package missing after install** — your shell probably has `NODE_ENV=production`, which makes npm skip dev dependencies. Use `npm i -D --include=dev github:fadhelmurphy/next-devtools` (the `init` command already does), or `unset NODE_ENV`. When working on this repo itself, run `npm install --include=dev`.
+
 ## Development
 
 ```bash

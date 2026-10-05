@@ -130,7 +130,7 @@ function detectPm(root) {
   if (has("pnpm-lock.yaml")) return { name: "pnpm", add: ["pnpm", "add", "-D"] };
   if (has("yarn.lock")) return { name: "yarn", add: ["yarn", "add", "-D"] };
   if (has("bun.lockb") || has("bun.lock")) return { name: "bun", add: ["bun", "add", "-d"] };
-  return { name: "npm", add: ["npm", "install", "-D"] };
+  return { name: "npm", add: ["npm", "install", "-D", "--include=dev"] };
 }
 function report(label, file, root, r) {
   const rel = file ? import_node_path2.default.relative(root, file) : "";

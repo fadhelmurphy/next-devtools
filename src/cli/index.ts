@@ -34,7 +34,8 @@ function detectPm(root: string): { name: string; add: string[] } {
   if (has("pnpm-lock.yaml")) return { name: "pnpm", add: ["pnpm", "add", "-D"] };
   if (has("yarn.lock")) return { name: "yarn", add: ["yarn", "add", "-D"] };
   if (has("bun.lockb") || has("bun.lock")) return { name: "bun", add: ["bun", "add", "-d"] };
-  return { name: "npm", add: ["npm", "install", "-D"] };
+  // --include=dev: with NODE_ENV=production npm would record the devDependency but not install it
+  return { name: "npm", add: ["npm", "install", "-D", "--include=dev"] };
 }
 
 function report(label: string, file: string | undefined, root: string, r: EditResult | null) {
