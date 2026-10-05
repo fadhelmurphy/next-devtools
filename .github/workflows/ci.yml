@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Build example (proves production output is clean)
+        working-directory: examples/app-router
+        run: |
+          npm install
+          npx next build
+          if grep -rq "data-nd-src" .next/static .next/server/app; then echo "devtools leaked into production" && exit 1; fi

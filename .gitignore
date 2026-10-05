@@ -1,0 +1,11 @@
+node_modules
+dist
+.next
+*.tsbuildinfo
+.DS_Store
+examples/*/node_modules
+examples/*/.next
+examples/*/next-env.d.ts
+examples/*/AGENTS.md
+examples/*/CLAUDE.md
+examples/*/package-lock.json
