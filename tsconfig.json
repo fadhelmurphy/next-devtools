@@ -12,5 +12,5 @@
     "isolatedModules": true,
     "types": ["node"]
   },
-  "include": ["src/config", "src/loader", "src/shared", "src/index.ts", "test"]
+  "include": ["src/config", "src/loader", "src/cli", "src/shared", "src/index.ts", "test"]
 }

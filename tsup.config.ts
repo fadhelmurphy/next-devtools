@@ -12,6 +12,14 @@ export default defineConfig([
     external: ["next", "react", "react-dom"],
   },
   {
+    entry: { cli: "src/cli/index.ts" },
+    format: ["cjs"],
+    platform: "node",
+    target: "node18",
+    banner: { js: "#!/usr/bin/env node" },
+    outExtension: () => ({ js: ".cjs" }),
+  },
+  {
     entry: { loader: "src/loader/index.ts" },
     format: ["cjs"],
     platform: "node",
