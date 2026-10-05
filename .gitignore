@@ -9,3 +9,4 @@ examples/*/next-env.d.ts
 examples/*/AGENTS.md
 examples/*/CLAUDE.md
 examples/*/package-lock.json
+docs/.video

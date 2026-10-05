@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getVitals, rate, subscribeVitals, THRESHOLDS, type Vitals } from "../vitals.js";
+import { getVitals, measuredPath, rate, subscribeVitals, THRESHOLDS, type Vitals } from "../vitals.js";
 import { formatBytes } from "./Assets.js";
 
 const META: { key: keyof Vitals; name: string; title: string; unit: "ms" | "" }[] = [
@@ -89,7 +89,9 @@ export function Performance() {
   return (
     <>
       <div className="nd-section">
-        <h3>Web Vitals for this page load</h3>
+        <h3>
+          Web Vitals for the page load of <code>{measuredPath}</code>
+        </h3>
         <div className="nd-vitals">
           {META.map((m) => {
             const value = v[m.key];
@@ -113,8 +115,8 @@ export function Performance() {
           })}
         </div>
         <p className="nd-faint" style={{ margin: "10px 0 0", maxWidth: "70ch" }}>
-          Dev mode is slower than production — compare against <code>next build && next start</code> before optimizing. INP updates as you
-          interact; empty values mean the browser hasn't reported them yet.
+          Measured from the last full page load; client-side navigations don't reset them. Dev mode is slower than production, so compare
+          against <code>next build && next start</code> before optimizing. INP updates as you interact.
         </p>
       </div>
       <div className="nd-section">

@@ -64,13 +64,15 @@ export const styles = /* css */ `
 .nd-layer { position: fixed; inset: 0; pointer-events: none; z-index: 2147483646; }
 .nd-box {
   position: fixed;
+  left: 0; top: 0;
   border: 1.5px solid var(--accent);
   background: var(--accent-wash);
   border-radius: 3px;
-  transition: left .06s, top .06s, width .06s, height .06s;
+  transition: transform .06s, width .06s, height .06s;
 }
 .nd-tip {
   position: fixed;
+  left: 0; top: 0;
   max-width: min(440px, calc(100vw - 8px));
   background: var(--surface);
   border: 1px solid var(--line);

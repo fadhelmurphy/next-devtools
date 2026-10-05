@@ -4,6 +4,10 @@ A [Nuxt DevTools](https://devtools.nuxt.com)-style panel for **Next.js**. Hover 
 
 Works with the **App Router and Pages Router**, **Turbopack and webpack**. Tested on Next.js 15 and 16 (React 19); Next.js 14 is supported on a best-effort basis. Development only: production builds contain none of it.
 
+![Next DevTools demo: inspecting elements, browsing the component tree, visiting a dynamic route and checking Web Vitals](docs/demo.gif)
+
+<sub>The demo runs <a href="examples/app-router">examples/app-router</a> on Next.js 16 with Turbopack: inspect elements and open their source, browse the tree with Server Components and live state, visit a dynamic route, check the layouts for the current URL, read Web Vitals.</sub>
+
 > Successor of [react-inspector-devtools](https://github.com/fadhelmurphy/react-inspector-devtools). That project needed the React DevTools extension and `_debugSource`, which React 19 removed. This one tags JSX at compile time, so it works on React 18 and 19, in Server Components, with no browser extension.
 
 ## What's in the panel
@@ -16,6 +20,23 @@ Works with the **App Router and Pages Router**, **Turbopack and webpack**. Teste
 | **Overview** | Next/React/Node/TypeScript versions, bundler, which layouts and page render the current URL, middleware / proxy, `NEXT_PUBLIC_*` variables, dependencies. |
 | **Assets** | Everything in `public/` with previews, sizes, copy-URL. |
 | **Performance** | LCP, INP, CLS, FCP, TTFB for the page load, document load phases, resources by type. |
+
+## Requirements
+
+| | Required | Notes |
+|---|---|---|
+| **Next.js** | 14.0 or newer | Tested on 15.5 and 16.3. Next 16 gets the full Turbopack integration (rules skip `node_modules`); on 14/15 a `*.tsx` / `*.jsx` Turbopack rule you already have takes precedence. |
+| **React / React DOM** | 18.2 or newer | **Server Components in the tree need React 19** (it's what Next's App Router ships). On React 18 you still get the inspector, client components, props and state. |
+| **Node.js** | 18.18 or newer | Whatever your Next.js needs wins: Next 15 runs on 18.18+, Next 16 needs 20.9+. |
+| **Mode** | `next dev` only | Nothing is added to `next build` / `next start`. |
+| **Bundler** | Turbopack or webpack | Both are configured automatically (`next dev`, `next dev --turbopack`, `next dev --webpack`). |
+| **Router** | App Router, Pages Router, or both | Mixed projects are fine; routes from both show up. |
+| **Browser** | Any current Chromium, Firefox or Safari | Needs Shadow DOM and `PerformanceObserver`. INP is only reported by Chromium browsers. |
+| **Local port** | `4590` free on `127.0.0.1` | Used by the local API (routes, assets, open-in-editor). Change it with the `port` option. |
+| **Editor** (optional) | VS Code, Cursor, Windsurf, Zed, WebStorm, Sublime, Vim… | Auto-detected from running processes, or set `LAUNCH_EDITOR` / the `editor` option. URL schemes work without any CLI on your `PATH`. |
+| **Package manager** | npm, pnpm, yarn or bun | No postinstall scripts, three small runtime dependencies (`@babel/parser`, `magic-string`, `launch-editor`). |
+
+Not supported: React Native / Expo, standalone Vite or CRA apps (this package hooks into `next.config`), and opening files when the browser runs on a different machine than `next dev` (the local API listens on `127.0.0.1`; use an editor URL scheme in Settings instead).
 
 ## Install
 
@@ -129,6 +150,8 @@ cd examples/pages-router && npm install && npm run dev
 ```
 
 The examples install the package by copy (`install-links=true` in `.npmrc`), so rerun `npm install` in an example after rebuilding.
+
+To re-record `docs/demo.gif`, start `examples/app-router` on port 3100 and run `node docs/record-demo.mjs` (needs `playwright` and `ffmpeg`).
 
 ## License
 

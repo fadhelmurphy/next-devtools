@@ -120,7 +120,9 @@ export function Routes() {
         </button>
         <span className="nd-faint">{routes.data ? `${list.length} of ${routes.data.length}` : ""}</span>
       </div>
-      {routes.data && !routes.data.length ? (
+      {routes.loading && !routes.data ? (
+        <p className="nd-faint">Scanning app/ and pages/…</p>
+      ) : routes.data && !routes.data.length ? (
         <div className="nd-empty">
           <strong>No routes found</strong>
           Add a <code>page.tsx</code> under <code>app/</code> or a file under <code>pages/</code>.

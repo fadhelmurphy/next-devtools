@@ -48,10 +48,10 @@ export function highlight(elements: Element[], label?: HighlightLabel) {
   if (!box || !tip) return;
   const rect = unionRect(elements);
   if (!rect) return hideHighlight();
+  // transform (not left/top) so moving the box never registers as a layout shift (CLS)
   Object.assign(box.style, {
     display: "block",
-    left: `${rect.left}px`,
-    top: `${rect.top}px`,
+    transform: `translate(${rect.left}px, ${rect.top}px)`,
     width: `${rect.width}px`,
     height: `${rect.height}px`,
   });
@@ -74,8 +74,7 @@ export function highlight(elements: Element[], label?: HighlightLabel) {
   if (top + th > window.innerHeight - 4) top = rect.top - th - 6;
   if (top < 4) top = Math.min(window.innerHeight - th - 4, Math.max(4, rect.top + 6));
   const left = Math.min(Math.max(4, rect.left), window.innerWidth - tw - 4);
-  tip.style.top = `${top}px`;
-  tip.style.left = `${left}px`;
+  tip.style.transform = `translate(${left}px, ${top}px)`;
 }
 
 export function hideHighlight() {
