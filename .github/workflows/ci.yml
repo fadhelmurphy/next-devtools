@@ -18,6 +18,8 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: dist/ is committed and up to date (installs from GitHub use it as-is)
+        run: git diff --exit-code --stat -- dist
       - name: Build example (proves production output is clean)
         working-directory: examples/app-router
         run: |

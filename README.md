@@ -59,7 +59,7 @@ npm i -D github:fadhelmurphy/next-devtools
 # bun add -d github:fadhelmurphy/next-devtools
 ```
 
-Installing from GitHub builds the package on your machine (a `prepare` script), which takes about half a minute the first time. Pin a commit or tag with `github:fadhelmurphy/next-devtools#<sha-or-tag>`.
+The repo ships a prebuilt `dist/`, so installing from GitHub needs no build step and no dev dependencies. Pin a commit or tag with `github:fadhelmurphy/next-devtools#<sha-or-tag>`.
 
 **1. Wrap your Next config**
 
@@ -159,7 +159,7 @@ export default withNextDevtools(nextConfig, {
 
 ```bash
 npm install
-npm run build        # dist/ (config + loader via tsup, client via tsc)
+npm run build        # dist/ (config + loader via tsup, client via tsc) — commit it, GitHub installs use it
 npm test             # loader transform + route scanner
 cd examples/app-router && npm install && npm run dev        # Turbopack
 cd examples/app-router && npm run dev:webpack               # webpack

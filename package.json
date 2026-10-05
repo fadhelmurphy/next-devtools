@@ -52,7 +52,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.client.json",
     "test": "vitest run",
     "prepublishOnly": "npm run build && npm test",
-    "prepare": "npm run build"
+    "check:dist": "npm run build && git diff --exit-code --stat -- dist"
   },
   "peerDependencies": {
     "next": ">=14.0.0",
