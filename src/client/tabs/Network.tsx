@@ -6,6 +6,7 @@ import { formatBytes } from "./Assets.js";
 const KIND_LABEL: Record<RequestKind, string> = {
   rsc: "RSC",
   action: "Server Action",
+  data: "Page data",
   api: "API",
   fetch: "Fetch",
   external: "External",
@@ -17,6 +18,7 @@ const FILTERS: { id: "all" | RequestKind; label: string }[] = [
   { id: "all", label: "All" },
   { id: "rsc", label: "RSC" },
   { id: "action", label: "Actions" },
+  { id: "data", label: "Page data" },
   { id: "api", label: "API" },
   { id: "fetch", label: "Fetch" },
   { id: "external", label: "External" },
@@ -90,7 +92,7 @@ export function Network() {
           {!list.length ? (
             <div className="nd-empty" style={{ padding: "20px 14px" }}>
               <strong>No requests yet</strong>
-              Client navigations, Server Actions, route handlers and fetch() calls from the browser show up here as they happen.
+              Client navigations, Server Actions, getServerSideProps data, route handlers and fetch() calls from the browser show up here as they happen.
             </div>
           ) : (
             <table className="nd-table nd-net">

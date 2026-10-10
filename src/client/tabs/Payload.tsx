@@ -27,6 +27,20 @@ export function Payload() {
   const route = routes.data ? matchRoute(routes.data, pathname) : undefined;
   const nextData = (window as any).__NEXT_DATA__;
   const appRouter = !nextData;
+  // Pages Router: __NEXT_DATA__ only describes the first page load; after client
+  // navigations the live data sits on the router.
+  const router = (window as any).next?.router;
+  const pageRoute: string | undefined = router?.route ?? nextData?.page;
+  const pageComp = router?.components?.[pageRoute ?? ""];
+  const livePageProps = pageComp?.props?.pageProps;
+  const isInitial = pageRoute === nextData?.page;
+  const pageProps = serializable(
+    Object.fromEntries(Object.entries(livePageProps ?? (isInitial ? nextData?.props?.pageProps : null) ?? {}).filter(([k]) => !k.startsWith("__N_"))),
+  );
+  const ssp = pageComp?.props?.__N_SSP ?? (isInitial ? nextData?.gssp : undefined);
+  const ssg = pageComp?.props?.__N_SSG ?? (isInitial ? nextData?.gsp : undefined);
+  const gip = isInitial ? nextData?.gip : pageComp?.Component?.getInitialProps !== undefined;
+  const method = ssp ? "getServerSideProps" : ssg ? "getStaticProps" : gip ? "getInitialProps" : isInitial && nextData?.isFallback ? "fallback" : "No data fetching method";
 
   // Props the server rendered the page with (React 19 dev keeps them on server component debug info)
   const serverProps: { name: string; props: unknown }[] = [];
@@ -76,15 +90,14 @@ export function Payload() {
 
       {nextData && (
         <div className="nd-section">
-          <h3>__NEXT_DATA__</h3>
+          <h3>Page props</h3>
           <p className="nd-faint" style={{ margin: "0 0 8px" }}>
-            {nextData.gssp ? "getServerSideProps" : nextData.isFallback ? "fallback" : nextData.gsp ? "getStaticProps" : "No data fetching method"}
-            , page <code>{nextData.page}</code>, build <code>{nextData.buildId}</code>
+            {method}, page <code>{pageRoute}</code>, build <code>{nextData.buildId}</code>
           </p>
           <div className="nd-json">
-            <JsonTree value={nextData.props?.pageProps ?? {}} name="pageProps" open={2} />
-            <JsonTree value={nextData.query ?? {}} name="query" open={0} />
-            <JsonTree value={nextData} name="__NEXT_DATA__" open={0} />
+            <JsonTree value={pageProps} name="pageProps" open={2} />
+            <JsonTree value={serializable(router?.query ?? nextData.query ?? {})} name="query" open={1} />
+            <JsonTree value={nextData} name="__NEXT_DATA__ (first load)" open={0} />
           </div>
         </div>
       )}

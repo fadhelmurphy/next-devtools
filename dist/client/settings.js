@@ -8,21 +8,21 @@ const defaults = {
     tab: "overview",
     open: false,
 };
-let current = { ...defaults };
+let current = Object.assign({}, defaults);
 try {
     const raw = typeof localStorage !== "undefined" ? localStorage.getItem(KEY) : null;
     if (raw)
-        current = { ...defaults, ...JSON.parse(raw) };
+        current = Object.assign(Object.assign({}, defaults), JSON.parse(raw));
 }
-catch { }
+catch (_a) { }
 const listeners = new Set();
 export const getSettings = () => current;
 export function updateSettings(patch) {
-    current = { ...current, ...patch };
+    current = Object.assign(Object.assign({}, current), patch);
     try {
         localStorage.setItem(KEY, JSON.stringify(current));
     }
-    catch { }
+    catch (_a) { }
     listeners.forEach((l) => l(current));
 }
 export function subscribeSettings(fn) {

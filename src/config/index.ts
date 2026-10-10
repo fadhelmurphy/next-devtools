@@ -28,29 +28,59 @@ const DEFAULT_PORT = 4590;
 const here = typeof __dirname !== "undefined" ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 const LOADER_PATH = path.join(here, "loader.cjs");
 
-function nextMajorMinor(root: string): [number, number] {
+function majorMinorOf(root: string, pkg: string, fallback: [number, number]): [number, number] {
   try {
-    const v: string = createRequire(path.join(root, "package.json"))("next/package.json").version;
+    const v: string = createRequire(path.join(root, "package.json"))(`${pkg}/package.json`).version;
     const [maj, min] = v.split(".").map(Number);
     return [maj || 0, min || 0];
   } catch {
-    return [16, 0];
+    return fallback;
   }
 }
 
-function addWebpackRule(config: NextConfigObject, root: string) {
+/** Client files that render the panel's React root: `createRoot` (React 18+) or `ReactDOM.render` (React 17). */
+const ROOT_MODERN = /[\\/]dist[\\/]client[\\/]root\.js$/;
+const ROOT_LEGACY = path.join(here, "client", "root-legacy.js");
+
+/**
+ * Swaps the panel's `createRoot` module for a `ReactDOM.render` one on React 17,
+ * where `react-dom/client` doesn't exist. Hooks the module factory directly so
+ * it works on webpack 4 (Next 10) and webpack 5 alike.
+ */
+class LegacyReactRootPlugin {
+  apply(compiler: any) {
+    compiler.hooks.normalModuleFactory.tap("NextDevtoolsLegacyRoot", (nmf: any) => {
+      nmf.hooks.afterResolve.tap("NextDevtoolsLegacyRoot", (data: any) => {
+        const target = data?.createData ?? data; // webpack 5 : webpack 4
+        if (target?.resource && ROOT_MODERN.test(target.resource)) {
+          target.resource = ROOT_LEGACY;
+          if (target.userRequest) target.userRequest = ROOT_LEGACY;
+        }
+        return data && !data.createData ? data : undefined; // webpack 4 waterfall expects the data back
+      });
+    });
+  }
+}
+
+function addWebpackRule(config: NextConfigObject, root: string, inspector: boolean, legacyReact: boolean) {
   const userWebpack = config.webpack;
   config.webpack = (webpackConfig: any, ctx: any) => {
     const result = typeof userWebpack === "function" ? userWebpack(webpackConfig, ctx) : webpackConfig;
     if (ctx?.dev) {
-      result.module = result.module || {};
-      result.module.rules = result.module.rules || [];
-      result.module.rules.unshift({
-        test: /\.(jsx|tsx|js|mjs)$/,
-        exclude: /[\\/]node_modules[\\/]/,
-        enforce: "pre",
-        use: [{ loader: LOADER_PATH, options: { root } }],
-      });
+      if (inspector) {
+        result.module = result.module || {};
+        result.module.rules = result.module.rules || [];
+        result.module.rules.unshift({
+          test: /\.(jsx|tsx|js|mjs)$/,
+          exclude: /[\\/]node_modules[\\/]/,
+          enforce: "pre",
+          use: [{ loader: LOADER_PATH, options: { root } }],
+        });
+      }
+      if (legacyReact) {
+        result.plugins = result.plugins || [];
+        result.plugins.push(new LegacyReactRootPlugin());
+      }
     }
     return result;
   };
@@ -72,13 +102,19 @@ function addTurbopackRules(config: NextConfigObject, root: string, [major, minor
     return;
   }
 
-  // Next 14.x / 15.x: single rule per glob, no conditions. The loader itself bails on node_modules.
-  const target =
-    major > 15 || (major === 15 && minor >= 3)
-      ? (config.turbopack = config.turbopack || {})
-      : ((config.experimental = config.experimental || {}), (config.experimental.turbo = config.experimental.turbo || {}));
+  // Turbopack before Next 14 was alpha with a different config shape; leave it alone.
+  if (major < 14) return;
+
+  // Next 14 – 15.x: single rule per glob, no conditions. The loader itself bails on node_modules.
+  const stable = major > 15 || (major === 15 && minor >= 3);
+  const target = stable
+    ? (config.turbopack = config.turbopack || {})
+    : ((config.experimental = config.experimental || {}), (config.experimental.turbo = config.experimental.turbo || {}));
   const rules = (target.rules = target.rules || {});
-  for (const glob of ["*.tsx", "*.jsx"]) {
+  // Next 14's Turbopack parses loader output as plain JS (TypeScript fails), and its
+  // `as: "*.tsx"` workaround breaks "use client" imports — so only .jsx gets tagged there.
+  const globs = major === 14 ? ["*.jsx"] : ["*.tsx", "*.jsx"];
+  for (const glob of globs) {
     if (rules[glob]) {
       console.warn(`[next-devtools] a Turbopack rule for "${glob}" already exists; inspector source mapping is disabled for those files.`);
       continue;
@@ -99,10 +135,7 @@ function addTurbopackRules(config: NextConfigObject, root: string, [major, minor
  * Does nothing outside `next dev`.
  */
 export function withNextDevtools(nextConfig: NextConfigInput = {}, options: NextDevtoolsOptions = {}): NextConfigFn {
-  return async (phase, ctx) => {
-    const resolved: NextConfigObject =
-      typeof nextConfig === "function" ? await nextConfig(phase, ctx) : { ...nextConfig };
-
+  const apply = (phase: string, resolved: NextConfigObject): NextConfigObject => {
     if (phase !== PHASE_DEVELOPMENT_SERVER || options.enabled === false || process.env.NEXT_DEVTOOLS === "0") {
       return resolved;
     }
@@ -113,6 +146,7 @@ export function withNextDevtools(nextConfig: NextConfigInput = {}, options: Next
     const port = Number(options.port ?? process.env.NEXT_DEVTOOLS_PORT ?? DEFAULT_PORT);
     const token = getOrCreateToken(root);
     const pageExtensions: string[] = config.pageExtensions ?? ["tsx", "ts", "jsx", "js"];
+    const [reactMajor] = majorMinorOf(root, "react", [19, 0]);
 
     // Inlined into the client bundle in dev only — this function never runs for `next build`.
     config.env = {
@@ -122,13 +156,21 @@ export function withNextDevtools(nextConfig: NextConfigInput = {}, options: Next
       NEXT_DEVTOOLS_ROOT: root,
     };
 
-    if (options.inspector !== false) {
-      addWebpackRule(config, root);
-      addTurbopackRules(config, root, nextMajorMinor(root));
-    }
+    addWebpackRule(config, root, options.inspector !== false, reactMajor < 18);
+    if (options.inspector !== false) addTurbopackRules(config, root, majorMinorOf(root, "next", [16, 0]));
 
     startDevtoolsServer({ root, port, token, editor: options.editor, pageExtensions });
     return config;
+  };
+
+  // Stay synchronous unless the user's own config is async: Next.js before 12.1
+  // doesn't accept a Promise from next.config.
+  return (phase, ctx) => {
+    const resolved = typeof nextConfig === "function" ? nextConfig(phase, ctx) : { ...nextConfig };
+    if (resolved && typeof (resolved as Promise<NextConfigObject>).then === "function") {
+      return (resolved as Promise<NextConfigObject>).then((c) => apply(phase, c));
+    }
+    return apply(phase, resolved as NextConfigObject);
   };
 }
 

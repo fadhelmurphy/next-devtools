@@ -23,7 +23,7 @@ function push(e) {
     emit();
 }
 function update(id, patch) {
-    entries = entries.map((e) => (e.id === id ? { ...e, ...patch } : e));
+    entries = entries.map((e) => (e.id === id ? Object.assign(Object.assign({}, e), patch) : e));
     emit();
 }
 const headersToObject = (h) => {
@@ -38,7 +38,7 @@ export function classify(url, headers) {
     try {
         u = new URL(url, location.href);
     }
-    catch {
+    catch (_a) {
         return "fetch";
     }
     if (headers["next-action"])
@@ -47,6 +47,9 @@ export function classify(url, headers) {
         return "rsc";
     if (u.origin !== location.origin)
         return "external";
+    // Pages Router: getServerSideProps / getStaticProps data on client navigation
+    if (u.pathname.startsWith("/_next/data/"))
+        return "data";
     if (u.pathname.startsWith("/_next/") || u.pathname.startsWith("/__nextjs"))
         return "next";
     if (u.pathname.startsWith("/api/"))
@@ -55,6 +58,7 @@ export function classify(url, headers) {
 }
 const isText = (ct) => !!ct && /json|text\/(plain|html|csv)|xml|javascript/.test(ct) && !/x-component/.test(ct);
 function bodyToString(body) {
+    var _a, _b;
     if (body == null)
         return undefined;
     if (typeof body === "string")
@@ -66,7 +70,7 @@ function bodyToString(body) {
         body.forEach((v, k) => parts.push(`${k}=${typeof v === "string" ? v : `[File ${v.name}]`}`));
         return parts.join("&");
     }
-    return `[${body.constructor?.name ?? "binary"}]`;
+    return `[${(_b = (_a = body.constructor) === null || _a === void 0 ? void 0 : _a.name) !== null && _b !== void 0 ? _b : "binary"}]`;
 }
 export function installNetworkRecorder() {
     if (installed || typeof window === "undefined")
@@ -74,11 +78,12 @@ export function installNetworkRecorder() {
     installed = true;
     const origFetch = window.fetch;
     window.fetch = async function (input, init) {
+        var _a, _b;
         const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
         if (API_ORIGIN && url.startsWith(API_ORIGIN))
             return origFetch.call(this, input, init);
-        const reqHeaders = { ...headersToObject(input instanceof Request ? input.headers : undefined), ...headersToObject(init?.headers) };
-        const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+        const reqHeaders = Object.assign(Object.assign({}, headersToObject(input instanceof Request ? input.headers : undefined)), headersToObject(init === null || init === void 0 ? void 0 : init.headers));
+        const method = ((_a = init === null || init === void 0 ? void 0 : init.method) !== null && _a !== void 0 ? _a : (input instanceof Request ? input.method : "GET")).toUpperCase();
         const id = nextId++;
         const start = performance.now();
         push({
@@ -88,7 +93,7 @@ export function installNetworkRecorder() {
             url,
             start,
             requestHeaders: reqHeaders,
-            requestBody: bodyToString(init?.body),
+            requestBody: bodyToString(init === null || init === void 0 ? void 0 : init.body),
             action: reqHeaders["next-action"],
         });
         try {
@@ -98,7 +103,7 @@ export function installNetworkRecorder() {
             update(id, {
                 status: res.status,
                 duration: performance.now() - start,
-                contentType: ct ?? undefined,
+                contentType: ct !== null && ct !== void 0 ? ct : undefined,
                 size: len,
                 responseHeaders: headersToObject(res.headers),
             });
@@ -106,13 +111,13 @@ export function installNetworkRecorder() {
                 res
                     .clone()
                     .text()
-                    .then((t) => update(id, { responseBody: t.slice(0, MAX_BODY), size: len ?? t.length }))
+                    .then((t) => update(id, { responseBody: t.slice(0, MAX_BODY), size: len !== null && len !== void 0 ? len : t.length }))
                     .catch(() => { });
             }
             return res;
         }
         catch (err) {
-            update(id, { error: String(err?.message ?? err), duration: performance.now() - start });
+            update(id, { error: String((_b = err === null || err === void 0 ? void 0 : err.message) !== null && _b !== void 0 ? _b : err), duration: performance.now() - start });
             throw err;
         }
     };
@@ -141,14 +146,14 @@ export function installNetworkRecorder() {
                 try {
                     text = isText(ct) && (this.responseType === "" || this.responseType === "text") ? String(this.responseText).slice(0, MAX_BODY) : undefined;
                 }
-                catch { }
+                catch (_a) { }
                 update(id, {
                     status: this.status || undefined,
                     error: this.status ? undefined : "Network error",
                     duration: performance.now() - start,
-                    contentType: ct ?? undefined,
+                    contentType: ct !== null && ct !== void 0 ? ct : undefined,
                     responseBody: text,
-                    size: text?.length,
+                    size: text === null || text === void 0 ? void 0 : text.length,
                 });
             });
         }

@@ -25,7 +25,7 @@ export function NextDevtools({ enabled = true }) {
             });
             return () => {
                 cancelled = true;
-                unmount?.();
+                unmount === null || unmount === void 0 ? void 0 : unmount();
             };
         }
     }, [enabled]);

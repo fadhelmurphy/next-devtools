@@ -1,12 +1,12 @@
-import { createRoot, type Root } from "react-dom/client";
 import { App } from "./App.js";
+import { renderRoot } from "./root.js";
 import { HOST_ID } from "./fiber.js";
 import { attachOverlay } from "./overlay.js";
 import { styles } from "./styles.js";
 import { startVitals } from "./vitals.js";
 import { installNetworkRecorder } from "./network.js";
 
-let root: Root | null = null;
+let unmountRoot: (() => void) | null = null;
 let host: HTMLElement | null = null;
 
 /**
@@ -30,12 +30,11 @@ export function mount(): () => void {
     shadow.append(style, overlayContainer, app);
     attachOverlay(overlayContainer);
     document.body.appendChild(host);
-    root = createRoot(app);
-    root.render(<App />);
+    unmountRoot = renderRoot(<App />, app);
   }
   return () => {
-    root?.unmount();
-    root = null;
+    unmountRoot?.();
+    unmountRoot = null;
     host?.remove();
     host = null;
   };

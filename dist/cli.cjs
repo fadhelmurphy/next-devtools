@@ -74,11 +74,12 @@ function addImport(code, line) {
   return line + "\n" + code;
 }
 function addToRootLayout(code) {
+  var _a;
   if (code.includes("NextDevtools")) return { status: "already", code };
   const close = code.lastIndexOf("</body>");
   if (close === -1) return { status: "manual", code, reason: "no `</body>` found" };
   const lineStart = code.lastIndexOf("\n", close) + 1;
-  const indent = code.slice(lineStart, close).match(/^\s*/)?.[0] ?? "";
+  const indent = ((_a = code.slice(lineStart, close).match(/^\s*/)) == null ? void 0 : _a[0]) ?? "";
   const inner = indent.length === close - lineStart ? indent + "  " : indent;
   const inserted = indent.length === close - lineStart ? code.slice(0, lineStart) + `${inner}<NextDevtools />
 ` + code.slice(lineStart) : code.slice(0, close) + `<NextDevtools />` + code.slice(close);
@@ -139,7 +140,19 @@ function report(label, file, root, r) {
   else if (r.status === "already") console.log(`  ${c.dim("\u2022")} ${label} ${c.dim(rel + " (already set up)")}`);
   else console.log(`  ${c.yellow("!")} ${label} ${c.dim(rel)} \u2014 ${r.reason}; add it by hand (see README)`);
 }
+function nextMajor(root, pkg) {
+  var _a, _b;
+  try {
+    const v = JSON.parse(import_node_fs2.default.readFileSync(import_node_path2.default.join(root, "node_modules", "next", "package.json"), "utf8")).version;
+    return parseInt(v, 10) || 99;
+  } catch {
+  }
+  const range = ((_a = pkg.dependencies) == null ? void 0 : _a.next) ?? ((_b = pkg.devDependencies) == null ? void 0 : _b.next) ?? "";
+  const m = range.match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : 99;
+}
 function run(argv) {
+  var _a, _b;
   const args = argv.slice(2);
   if (!args.length || args.includes("-h") || args.includes("--help")) {
     console.log(HELP);
@@ -161,7 +174,7 @@ function run(argv) {
     console.error(c.red(`No package.json in ${root}. Run this inside your Next.js project.`));
     return 1;
   }
-  if (!pkg.dependencies?.next && !pkg.devDependencies?.next) {
+  if (!((_a = pkg.dependencies) == null ? void 0 : _a.next) && !((_b = pkg.devDependencies) == null ? void 0 : _b.next)) {
     console.error(c.red(`"next" isn't a dependency of ${pkg.name ?? root}. Run this inside your Next.js project.`));
     return 1;
   }
@@ -191,8 +204,15 @@ ${c.cyan("\u25C6")} ${c.bold("Next DevTools")} ${c.dim("\u2192 " + (pkg.name ?? 
     write(files.config, r);
     report("Wrapped config with withNextDevtools()", files.config, root, r);
   } else {
-    const file = import_node_path2.default.join(root, "next.config.mjs");
-    const code = `import { withNextDevtools } from "${PKG2}";
+    const legacy = nextMajor(root, pkg) < 12;
+    const file = import_node_path2.default.join(root, legacy ? "next.config.js" : "next.config.mjs");
+    const code = legacy ? `const { withNextDevtools } = require("${PKG2}");
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {};
+
+module.exports = withNextDevtools(nextConfig);
+` : `import { withNextDevtools } from "${PKG2}";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {};
@@ -207,13 +227,13 @@ export default withNextDevtools(nextConfig);
     const r = addToRootLayout(import_node_fs2.default.readFileSync(files.layout, "utf8"));
     write(files.layout, r);
     report("Added <NextDevtools /> to the root layout", files.layout, root, r);
-    mounted ||= r.status !== "manual";
+    mounted || (mounted = r.status !== "manual");
   }
   if (files.pagesApp) {
     const r = addToPagesApp(import_node_fs2.default.readFileSync(files.pagesApp, "utf8"));
     write(files.pagesApp, r);
     report("Added <NextDevtools /> to _app", files.pagesApp, root, r);
-    mounted ||= r.status !== "manual";
+    mounted || (mounted = r.status !== "manual");
   } else if (files.pagesDir && !files.layout) {
     const ts = import_node_fs2.default.existsSync(import_node_path2.default.join(root, "tsconfig.json"));
     const file = import_node_path2.default.join(files.pagesDir, ts ? "_app.tsx" : "_app.jsx");

@@ -24,10 +24,11 @@ export function fillRoute(route, values) {
     const url = route
         .split("/")
         .map((seg) => {
+        var _a;
         const m = seg.match(/^\[{1,2}(?:\.\.\.)?([^\]]+)\]{1,2}$/);
         if (!m)
             return seg;
-        const v = (values[m[1]] ?? "").trim();
+        const v = ((_a = values[m[1]]) !== null && _a !== void 0 ? _a : "").trim();
         return v
             .split("/")
             .filter(Boolean)
@@ -40,13 +41,14 @@ export function fillRoute(route, values) {
 }
 /** Client-side navigation through Next's router when it's exposed, else a full load. */
 export function navigate(url) {
-    const router = window.next?.router;
+    var _a;
+    const router = (_a = window.next) === null || _a === void 0 ? void 0 : _a.router;
     if (router && typeof router.push === "function") {
         try {
             router.push(url);
             return;
         }
-        catch { }
+        catch (_b) { }
     }
     window.location.assign(url);
 }

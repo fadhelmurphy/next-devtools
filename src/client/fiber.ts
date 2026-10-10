@@ -38,6 +38,10 @@ const INTERNAL = new Set([
   // Next 16
   "RootErrorBoundary", "ViewportWrapper", "MetadataWrapper", "SegmentTrieNode", "ScrollAndMaybeFocusHandler",
   "InnerScrollHandlerNew", "InnerScrollHandlerOld", "DevToolsIndicator", "NextLogo", "DevOverlayRoot",
+  // Next 13 – 15
+  "DevRootNotFoundBoundary", "RSCComponent", "BrowserResolvedMetadata", "ServerResolvedMetadata", "ReactServerEntrypoint",
+  "AppRouterContextProvider", "ServerInsertedHTMLProvider", "RootLayoutBoundary", "Body", "ReactDevOverlay",
+  "MetadataOutletImpl", "NotFoundErrorBoundaryImpl", "StaticGenerationSearchParamsBailoutProvider", "FontStyles",
 ]);
 
 export const isInternalName = (name: string) =>
@@ -50,7 +54,7 @@ function keyStartingWith(obj: object, prefix: string): string | undefined {
 
 export function getFiberFromNode(node: Node | null): Fiber | null {
   if (!node) return null;
-  const k = keyStartingWith(node, "__reactFiber$");
+  const k = keyStartingWith(node, "__reactFiber$") ?? keyStartingWith(node, "__reactInternalInstance$"); // 17+ : 16
   return k ? (node as any)[k] : null;
 }
 
@@ -115,7 +119,8 @@ export interface BuildOptions {
 function debugInfoOf(f: Fiber): ServerInfo[] {
   const info = f?._debugInfo;
   if (!Array.isArray(info)) return [];
-  return info.filter((i) => i && typeof i.name === "string");
+  // React also records timing/env entries without a name; those aren't components.
+  return info.filter((i) => i && typeof i.name === "string" && i.name.length > 0);
 }
 
 /** Next's own error overlay is portaled into <nextjs-portal>; never part of "your" tree. */
@@ -238,8 +243,15 @@ export function ownerOfElement(el: Element): { name: string; server: boolean; ow
     if (!isInternalName(name)) return { name, server: isServer, owner };
     owner = owner.owner ?? owner._debugOwner;
   }
-  for (let f = fiber.return; f; f = f.return) {
-    if (isComponentFiber(f) && !isInternalName(getDisplayName(f))) return { name: getDisplayName(f), server: false, owner: f };
+  // No usable owner (React < 19, or only Next internals): take the closest
+  // enclosing component — a client fiber, or a Server Component recorded in _debugInfo.
+  for (let f: Fiber = fiber; f; f = f.return) {
+    if (f !== fiber && isComponentFiber(f) && !isInternalName(getDisplayName(f))) return { name: getDisplayName(f), server: false, owner: f };
+    const infos = debugInfoOf(f).filter((i) => !isInternalName(i.name));
+    if (infos.length) {
+      const inner = infos[infos.length - 1];
+      return { name: inner.name, server: true, owner: inner };
+    }
   }
   return null;
 }

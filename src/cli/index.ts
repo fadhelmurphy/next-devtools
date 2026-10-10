@@ -46,6 +46,17 @@ function report(label: string, file: string | undefined, root: string, r: EditRe
   else console.log(`  ${c.yellow("!")} ${label} ${c.dim(rel)} — ${r.reason}; add it by hand (see README)`);
 }
 
+/** Installed Next.js major, else the one in package.json's range, else "recent". */
+function nextMajor(root: string, pkg: any): number {
+  try {
+    const v = JSON.parse(fs.readFileSync(path.join(root, "node_modules", "next", "package.json"), "utf8")).version;
+    return parseInt(v, 10) || 99;
+  } catch {}
+  const range: string = pkg.dependencies?.next ?? pkg.devDependencies?.next ?? "";
+  const m = range.match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : 99;
+}
+
 export function run(argv: string[]): number {
   const args = argv.slice(2);
   if (!args.length || args.includes("-h") || args.includes("--help")) {
@@ -102,8 +113,12 @@ export function run(argv: string[]): number {
     write(files.config, r);
     report("Wrapped config with withNextDevtools()", files.config, root, r);
   } else {
-    const file = path.join(root, "next.config.mjs");
-    const code = `import { withNextDevtools } from "${PKG}";\n\n/** @type {import('next').NextConfig} */\nconst nextConfig = {};\n\nexport default withNextDevtools(nextConfig);\n`;
+    // next.config.mjs needs Next 12+; CommonJS works everywhere.
+    const legacy = nextMajor(root, pkg) < 12;
+    const file = path.join(root, legacy ? "next.config.js" : "next.config.mjs");
+    const code = legacy
+      ? `const { withNextDevtools } = require("${PKG}");\n\n/** @type {import('next').NextConfig} */\nconst nextConfig = {};\n\nmodule.exports = withNextDevtools(nextConfig);\n`
+      : `import { withNextDevtools } from "${PKG}";\n\n/** @type {import('next').NextConfig} */\nconst nextConfig = {};\n\nexport default withNextDevtools(nextConfig);\n`;
     if (!dry) fs.writeFileSync(file, code);
     report("Created config with withNextDevtools()", file, root, { status: "updated", code });
   }

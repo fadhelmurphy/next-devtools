@@ -370,6 +370,7 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 2px 6px; border: 1px s
 .nd-upd-patch { background: var(--client-wash); color: var(--client); }
 .nd-kind-rsc { background: var(--accent-wash); color: var(--accent-strong); }
 .nd-kind-action { background: var(--server-wash); color: var(--server); }
+.nd-kind-data { background: var(--client-wash); color: var(--client); }
 .nd-kind-api { background: var(--client-wash); color: var(--client); }
 .nd-kind-navigation { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
 .nd-net tr { cursor: pointer; }

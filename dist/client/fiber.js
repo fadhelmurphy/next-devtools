@@ -1,5 +1,16 @@
 /* Reading React's internal fiber tree. Dev-only and deliberately defensive:
    these are private fields, so every access tolerates them being absent. */
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 import { SOURCE_ATTR } from "../shared/types.js";
 import { parseSource } from "./api.js";
 export const HOST_ID = "next-devtools-host";
@@ -31,6 +42,10 @@ const INTERNAL = new Set([
     // Next 16
     "RootErrorBoundary", "ViewportWrapper", "MetadataWrapper", "SegmentTrieNode", "ScrollAndMaybeFocusHandler",
     "InnerScrollHandlerNew", "InnerScrollHandlerOld", "DevToolsIndicator", "NextLogo", "DevOverlayRoot",
+    // Next 13 – 15
+    "DevRootNotFoundBoundary", "RSCComponent", "BrowserResolvedMetadata", "ServerResolvedMetadata", "ReactServerEntrypoint",
+    "AppRouterContextProvider", "ServerInsertedHTMLProvider", "RootLayoutBoundary", "Body", "ReactDevOverlay",
+    "MetadataOutletImpl", "NotFoundErrorBoundaryImpl", "StaticGenerationSearchParamsBailoutProvider", "FontStyles",
 ]);
 export const isInternalName = (name) => INTERNAL.has(name) || /^__next_/.test(name) || /^Next\./.test(name) || (/Boundary$/.test(name) && /^(Metadata|Viewport|Outlet)/.test(name));
 function keyStartingWith(obj, prefix) {
@@ -40,46 +55,50 @@ function keyStartingWith(obj, prefix) {
     return undefined;
 }
 export function getFiberFromNode(node) {
+    var _a;
     if (!node)
         return null;
-    const k = keyStartingWith(node, "__reactFiber$");
+    const k = (_a = keyStartingWith(node, "__reactFiber$")) !== null && _a !== void 0 ? _a : keyStartingWith(node, "__reactInternalInstance$"); // 17+ : 16
     return k ? node[k] : null;
 }
 /** Current HostRoot fibers of every React root on the page (except our own panel). */
 export function findRoots() {
+    var _a, _b, _c;
     const containers = [document];
     const next = document.getElementById("__next");
     if (next)
         containers.push(next);
-    document.body?.childNodes.forEach(
+    (_a = document.body) === null || _a === void 0 ? void 0 : _a.childNodes.forEach(
     // Skip our own panel and Next's dev overlay root (<nextjs-portal>).
     (n) => n instanceof Element && n.id !== HOST_ID && n.tagName !== "NEXTJS-PORTAL" && containers.push(n));
     const roots = [];
     for (const c of containers) {
         const k = keyStartingWith(c, "__reactContainer$");
         const hostRoot = k ? c[k] : null;
-        const current = hostRoot?.stateNode?.current ?? hostRoot;
+        const current = (_c = (_b = hostRoot === null || hostRoot === void 0 ? void 0 : hostRoot.stateNode) === null || _b === void 0 ? void 0 : _b.current) !== null && _c !== void 0 ? _c : hostRoot;
         if (current && !roots.includes(current))
             roots.push(current);
     }
     return roots;
 }
 export function getDisplayName(fiber) {
-    const t = fiber?.type;
+    var _a, _b;
+    const t = fiber === null || fiber === void 0 ? void 0 : fiber.type;
     if (!t)
         return "Anonymous";
     if (typeof t === "string")
         return t;
-    const inner = t.render ?? t.type ?? t;
-    return t.displayName || inner?.displayName || inner?.name || t.name || "Anonymous";
+    const inner = (_b = (_a = t.render) !== null && _a !== void 0 ? _a : t.type) !== null && _b !== void 0 ? _b : t;
+    return t.displayName || (inner === null || inner === void 0 ? void 0 : inner.displayName) || (inner === null || inner === void 0 ? void 0 : inner.name) || t.name || "Anonymous";
 }
 export const isComponentFiber = (f) => f && COMPONENT_TAGS.has(f.tag);
 // ---- stable ids across fiber alternates -----------------------------------
 let nextId = 1;
 const ids = new WeakMap();
 export function idOf(obj) {
+    var _a;
     const alt = obj.alternate;
-    let id = ids.get(obj) ?? (alt ? ids.get(alt) : undefined);
+    let id = (_a = ids.get(obj)) !== null && _a !== void 0 ? _a : (alt ? ids.get(alt) : undefined);
     if (id === undefined)
         id = nextId++;
     ids.set(obj, id);
@@ -88,19 +107,21 @@ export function idOf(obj) {
     return id;
 }
 function debugInfoOf(f) {
-    const info = f?._debugInfo;
+    const info = f === null || f === void 0 ? void 0 : f._debugInfo;
     if (!Array.isArray(info))
         return [];
-    return info.filter((i) => i && typeof i.name === "string");
+    // React also records timing/env entries without a name; those aren't components.
+    return info.filter((i) => i && typeof i.name === "string" && i.name.length > 0);
 }
 /** Next's own error overlay is portaled into <nextjs-portal>; never part of "your" tree. */
 function isNextOverlay(f) {
+    var _a, _b;
     for (let c = f, i = 0; c && i < 4; c = c.child, i++) {
         if (c.tag === 4 /* HostPortal */) {
-            const container = c.stateNode?.containerInfo;
+            const container = (_a = c.stateNode) === null || _a === void 0 ? void 0 : _a.containerInfo;
             const hostEl = container instanceof ShadowRoot ? container.host : container;
             // Next's error overlay and the Pages Router's route announcer
-            return !!hostEl?.closest?.("nextjs-portal, next-route-announcer");
+            return !!((_b = hostEl === null || hostEl === void 0 ? void 0 : hostEl.closest) === null || _b === void 0 ? void 0 : _b.call(hostEl, "nextjs-portal, next-route-announcer"));
         }
     }
     return false;
@@ -190,7 +211,7 @@ export function sourceOfNode(node) {
             if (loc) {
                 if (f._debugOwner === owner || sameFiber(f._debugOwner, owner))
                     return loc;
-                fallback ?? (fallback = loc);
+                fallback !== null && fallback !== void 0 ? fallback : (fallback = loc);
             }
         }
         for (let c = f.child; c; c = c.sibling) {
@@ -209,6 +230,7 @@ export function sourceOfNode(node) {
 }
 /** The component (client fiber or server info) that rendered a DOM element. */
 export function ownerOfElement(el) {
+    var _a;
     const fiber = getFiberFromNode(el);
     if (!fiber)
         return null;
@@ -219,16 +241,24 @@ export function ownerOfElement(el) {
         const name = isServer ? owner.name : getDisplayName(owner);
         if (!isInternalName(name))
             return { name, server: isServer, owner };
-        owner = owner.owner ?? owner._debugOwner;
+        owner = (_a = owner.owner) !== null && _a !== void 0 ? _a : owner._debugOwner;
     }
-    for (let f = fiber.return; f; f = f.return) {
-        if (isComponentFiber(f) && !isInternalName(getDisplayName(f)))
+    // No usable owner (React < 19, or only Next internals): take the closest
+    // enclosing component — a client fiber, or a Server Component recorded in _debugInfo.
+    for (let f = fiber; f; f = f.return) {
+        if (f !== fiber && isComponentFiber(f) && !isInternalName(getDisplayName(f)))
             return { name: getDisplayName(f), server: false, owner: f };
+        const infos = debugInfoOf(f).filter((i) => !isInternalName(i.name));
+        if (infos.length) {
+            const inner = infos[infos.length - 1];
+            return { name: inner.name, server: true, owner: inner };
+        }
     }
     return null;
 }
 // ---- inspecting values ------------------------------------------------------
 export function preview(value, depth = 0, seen = new WeakSet()) {
+    var _a, _b;
     if (value === null)
         return "null";
     if (value === undefined)
@@ -247,7 +277,7 @@ export function preview(value, depth = 0, seen = new WeakSet()) {
         return "[Circular]";
     seen.add(obj);
     if (obj.$$typeof) {
-        const name = typeof obj.type === "string" ? obj.type : obj.type?.displayName || obj.type?.name || "Component";
+        const name = typeof obj.type === "string" ? obj.type : ((_a = obj.type) === null || _a === void 0 ? void 0 : _a.displayName) || ((_b = obj.type) === null || _b === void 0 ? void 0 : _b.name) || "Component";
         return `<${name} />`;
     }
     if (typeof Element !== "undefined" && obj instanceof Element)
@@ -271,11 +301,12 @@ export function preview(value, depth = 0, seen = new WeakSet()) {
     return `{ ${entries.join(", ")}${keys.length > 8 ? `, …${keys.length - 8} more` : ""} }`;
 }
 export function propsOf(node) {
-    const raw = node.kind === "server" ? node.info?.props : node.fibers[0]?.memoizedProps;
+    var _a, _b;
+    const raw = node.kind === "server" ? (_a = node.info) === null || _a === void 0 ? void 0 : _a.props : (_b = node.fibers[0]) === null || _b === void 0 ? void 0 : _b.memoizedProps;
     if (!raw || typeof raw !== "object")
         return {};
-    const { children, ...rest } = raw;
-    return children === undefined ? rest : { ...rest, children };
+    const _c = raw, { children } = _c, rest = __rest(_c, ["children"]);
+    return children === undefined ? rest : Object.assign(Object.assign({}, rest), { children });
 }
 /** useState / useReducer values (function components) or this.state (classes). */
 export function stateOf(node) {
@@ -320,6 +351,6 @@ export function onCommit(fn, interval = 1500) {
         clearInterval(poll);
         if (timer)
             clearTimeout(timer);
-        restore?.();
+        restore === null || restore === void 0 ? void 0 : restore();
     };
 }

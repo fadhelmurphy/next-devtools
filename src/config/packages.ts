@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import https from "node:https";
 import path from "node:path";
 import { createRequire } from "node:module";
 import type { PackageEntry } from "../shared/types";
@@ -36,19 +37,44 @@ export function updateType(installed?: string, latest?: string | null): PackageE
   return undefined;
 }
 
+/** GET a JSON document with a 5s timeout. Uses fetch when present (honours proxies on newer Node), https otherwise (Node < 18). */
+function getJson(url: string): Promise<any> {
+  if (typeof fetch === "function" && typeof AbortController === "function") {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    return fetch(url, { signal: ctrl.signal, headers: { accept: "application/json" } })
+      .then((r) => (r.ok ? r.json() : null))
+      .finally(() => clearTimeout(t));
+  }
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers: { accept: "application/json" }, timeout: 5000 }, (res) => {
+      if (res.statusCode !== 200) {
+        res.resume();
+        return resolve(null);
+      }
+      let data = "";
+      res.setEncoding("utf8");
+      res.on("data", (c) => (data += c));
+      res.on("end", () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+    req.on("timeout", () => req.destroy(new Error("timeout")));
+    req.on("error", reject);
+  });
+}
+
 async function fetchLatest(name: string): Promise<string | null> {
   const hit = latestCache.get(name);
   if (hit && Date.now() - hit.at < TTL) return hit.version;
   let version: string | null = null;
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 5000);
-    const res = await fetch(`https://registry.npmjs.org/${name.replace("/", "%2F")}/latest`, {
-      signal: ctrl.signal,
-      headers: { accept: "application/json" },
-    });
-    clearTimeout(t);
-    if (res.ok) version = ((await res.json()) as any).version ?? null;
+    const body = await getJson(`https://registry.npmjs.org/${name.replace("/", "%2F")}/latest`);
+    version = body?.version ?? null;
   } catch {
     version = null; // offline or blocked: just don't show update info
   }

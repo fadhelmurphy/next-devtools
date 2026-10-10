@@ -32,11 +32,12 @@ function Phases() {
     return (_jsx("div", { className: "nd-waterfall", children: phases.map((p) => (_jsxs("div", { className: "nd-wf-row", children: [_jsx("span", { className: "nd-muted", children: p.name }), _jsx("div", { className: "nd-wf-track", children: _jsx("div", { className: "nd-wf-bar", style: { left: `${(p.start / total) * 100}%`, width: `${((p.end - p.start) / total) * 100}%` } }) }), _jsxs("span", { children: [Math.round(p.end - p.start), " ms"] })] }, p.name))) }));
 }
 function Resources() {
+    var _a;
     const entries = performance.getEntriesByType("resource");
     const groups = new Map();
     for (const e of entries) {
         const type = e.initiatorType === "link" && /\.css(\?|$)/.test(e.name) ? "css" : e.initiatorType || "other";
-        const g = groups.get(type) ?? { count: 0, bytes: 0, slowest: 0 };
+        const g = (_a = groups.get(type)) !== null && _a !== void 0 ? _a : { count: 0, bytes: 0, slowest: 0 };
         g.count++;
         g.bytes += e.transferSize || e.encodedBodySize || 0;
         g.slowest = Math.max(g.slowest, e.duration);

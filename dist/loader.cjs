@@ -81,12 +81,16 @@ function injectSourceAttributes(source, opts) {
   const s = new import_magic_string.default(source);
   let count = 0;
   const visit = (node) => {
+    var _a;
     if (!node || typeof node.type !== "string") return;
-    if (node.type === "JSXOpeningElement" && node.name?.type === "JSXIdentifier") {
+    if (node.type === "JSXOpeningElement" && ((_a = node.name) == null ? void 0 : _a.type) === "JSXIdentifier") {
       const tag = node.name.name;
       if (/^[a-z]/.test(tag) && !SKIP_TAGS.has(tag)) {
         const already = node.attributes.some(
-          (a) => a.type === "JSXAttribute" && a.name?.name === attr
+          (a) => {
+            var _a2;
+            return a.type === "JSXAttribute" && ((_a2 = a.name) == null ? void 0 : _a2.name) === attr;
+          }
         );
         if (!already && node.loc && typeof node.name.end === "number") {
           const { line, column } = node.loc.start;
@@ -116,14 +120,15 @@ function injectSourceAttributes(source, opts) {
 
 // src/loader/index.ts
 function nextDevtoolsLoader(source, inputMap) {
-  this.cacheable?.(true);
+  var _a, _b;
+  (_a = this.cacheable) == null ? void 0 : _a.call(this, true);
   const file = this.resourcePath;
   if (!file || /[\\/]node_modules[\\/]/.test(file) || /[\\/]\.next[\\/]/.test(file)) {
     return this.callback(null, source, inputMap);
   }
   let options = {};
   try {
-    options = this.getOptions?.() ?? (typeof this.query === "object" && this.query ? this.query : {});
+    options = ((_b = this.getOptions) == null ? void 0 : _b.call(this)) ?? (typeof this.query === "object" && this.query ? this.query : {});
   } catch {
     options = {};
   }

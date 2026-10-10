@@ -4,7 +4,7 @@
 
 import { API_ORIGIN } from "./api.js";
 
-export type RequestKind = "rsc" | "action" | "api" | "fetch" | "external" | "next" | "navigation";
+export type RequestKind = "rsc" | "action" | "data" | "api" | "fetch" | "external" | "next" | "navigation";
 
 export interface NetEntry {
   id: number;
@@ -69,6 +69,8 @@ export function classify(url: string, headers: Record<string, string>): RequestK
   if (headers["next-action"]) return "action";
   if (headers["rsc"] === "1" || u.searchParams.has("_rsc")) return "rsc";
   if (u.origin !== location.origin) return "external";
+  // Pages Router: getServerSideProps / getStaticProps data on client navigation
+  if (u.pathname.startsWith("/_next/data/")) return "data";
   if (u.pathname.startsWith("/_next/") || u.pathname.startsWith("/__nextjs")) return "next";
   if (u.pathname.startsWith("/api/")) return "api";
   return "fetch";

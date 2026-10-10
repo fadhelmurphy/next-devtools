@@ -3,15 +3,17 @@
 import { HOST_ID } from "./fiber.js";
 /** True when a layout shift happened only inside the DevTools panel itself. */
 function onlyOurs(entry) {
-    const sources = entry.sources ?? [];
+    var _a;
+    const sources = (_a = entry.sources) !== null && _a !== void 0 ? _a : [];
     if (!sources.length)
         return false;
     return sources.every((s) => {
+        var _a, _b;
         const node = s.node;
         if (!node)
             return false;
-        const root = node.getRootNode?.();
-        return root?.host?.id === HOST_ID || node.id === HOST_ID;
+        const root = (_a = node.getRootNode) === null || _a === void 0 ? void 0 : _a.call(node);
+        return ((_b = root === null || root === void 0 ? void 0 : root.host) === null || _b === void 0 ? void 0 : _b.id) === HOST_ID || node.id === HOST_ID;
     });
 }
 export const THRESHOLDS = {
@@ -29,18 +31,20 @@ const listeners = new Set();
 let started = false;
 const emit = () => listeners.forEach((l) => l());
 function observe(type, cb, extra = {}) {
-    if (!PerformanceObserver.supportedEntryTypes?.includes(type))
+    var _a;
+    if (!((_a = PerformanceObserver.supportedEntryTypes) === null || _a === void 0 ? void 0 : _a.includes(type)))
         return false;
     try {
         const po = new PerformanceObserver((list) => cb(list.getEntries()));
-        po.observe({ type, buffered: true, ...extra });
+        po.observe(Object.assign({ type, buffered: true }, extra));
         return true;
     }
-    catch {
+    catch (_b) {
         return false; // entry type not supported in this browser
     }
 }
 export function startVitals() {
+    var _a;
     if (started || typeof PerformanceObserver === "undefined")
         return;
     started = true;
@@ -66,6 +70,7 @@ export function startVitals() {
     // CLS: largest session window (gap < 1s, window < 5s)
     let session = 0, sessionStart = 0, sessionLast = 0;
     const clsSupported = observe("layout-shift", (entries) => {
+        var _a;
         for (const e of entries) {
             // Shifts caused by client-side navigation belong to another page, not this load.
             if (e.hadRecentInput || !samePage() || onlyOurs(e))
@@ -77,25 +82,26 @@ export function startVitals() {
                 sessionStart = e.startTime;
             }
             sessionLast = e.startTime;
-            vitals.cls = Math.max(vitals.cls ?? 0, session);
+            vitals.cls = Math.max((_a = vitals.cls) !== null && _a !== void 0 ? _a : 0, session);
         }
         emit();
     });
     // No shifts at all is a real (perfect) score, not "unknown".
     if (clsSupported)
-        vitals.cls ?? (vitals.cls = 0);
+        (_a = vitals.cls) !== null && _a !== void 0 ? _a : (vitals.cls = 0);
     // INP approximation: worst interaction latency seen so far.
     observe("event", (entries) => {
+        var _a;
         for (const e of entries) {
             if (!e.interactionId)
                 continue;
-            vitals.inp = Math.max(vitals.inp ?? 0, e.duration);
+            vitals.inp = Math.max((_a = vitals.inp) !== null && _a !== void 0 ? _a : 0, e.duration);
         }
         emit();
     }, { durationThreshold: 16 });
     emit();
 }
-export const getVitals = () => ({ ...vitals });
+export const getVitals = () => (Object.assign({}, vitals));
 export function subscribeVitals(fn) {
     listeners.add(fn);
     return () => void listeners.delete(fn);

@@ -104,13 +104,17 @@ function scanAppRouter(root, appDir, exts) {
   const routes = [];
   const extRe = new RegExp(`^(page|route|layout)\\.(${exts.map((e) => e.replace(/\./g, "\\.")).join("|")})$`);
   const walk = (dir, segments, layouts) => {
+    var _a;
     const entries = readDir(dir);
     const here2 = [...layouts];
-    const layout = entries.find((e) => e.isFile() && extRe.exec(e.name)?.[1] === "layout");
+    const layout = entries.find((e) => {
+      var _a2;
+      return e.isFile() && ((_a2 = extRe.exec(e.name)) == null ? void 0 : _a2[1]) === "layout";
+    });
     if (layout) here2.push(toPosix(import_node_path.default.relative(root, import_node_path.default.join(dir, layout.name))));
     for (const e of entries) {
       if (!e.isFile()) continue;
-      const kind = extRe.exec(e.name)?.[1];
+      const kind = (_a = extRe.exec(e.name)) == null ? void 0 : _a[1];
       if (kind !== "page" && kind !== "route") continue;
       let slot;
       let intercepting = false;
@@ -201,9 +205,10 @@ function readJson(file) {
   }
 }
 function installedVersion(root, pkg) {
+  var _a;
   try {
     const req2 = (0, import_node_module.createRequire)(import_node_path2.default.join(root, "package.json"));
-    return readJson(req2.resolve(`${pkg}/package.json`))?.version;
+    return (_a = readJson(req2.resolve(`${pkg}/package.json`))) == null ? void 0 : _a.version;
   } catch {
     return void 0;
   }
@@ -439,6 +444,7 @@ function resolveImport(spec, fromFile, ts, known) {
   return null;
 }
 function exportedComponents(code, file) {
+  var _a;
   const names = /* @__PURE__ */ new Set();
   const patterns = [
     /export\s+default\s+(?:async\s+)?function\s+([A-Z]\w*)/g,
@@ -452,7 +458,7 @@ function exportedComponents(code, file) {
     for (const m of code.matchAll(re)) {
       if (re.source.startsWith("export\\s*\\{")) {
         for (const part of m[1].split(",")) {
-          const n = part.trim().split(/\s+as\s+/).pop()?.trim();
+          const n = (_a = part.trim().split(/\s+as\s+/).pop()) == null ? void 0 : _a.trim();
           if (n && /^[A-Z]\w*$/.test(n)) names.add(n);
         }
       } else names.add(m[1]);
@@ -465,6 +471,7 @@ function exportedComponents(code, file) {
   return [...names];
 }
 function scanComponents(root, appDir, pagesDir) {
+  var _a;
   const files = [];
   const walk = (dir) => {
     let entries = [];
@@ -513,7 +520,7 @@ function scanComponents(root, appDir, pagesDir) {
     const names = exportedComponents(code, file);
     if (!names.length) continue;
     const head = code.slice(0, 400).replace(/^\s*(\/\/.*\n|\/\*[\s\S]*?\*\/\s*)*/, "");
-    const directive = head.match(/^["']use (client|server)["']/)?.[1];
+    const directive = (_a = head.match(/^["']use (client|server)["']/)) == null ? void 0 : _a[1];
     const inApp = !!appDir && file.startsWith(appDir + import_node_path4.default.sep);
     const inPages = !!pagesDir && file.startsWith(pagesDir + import_node_path4.default.sep);
     const base = import_node_path4.default.basename(file).replace(EXT_RE, "");
@@ -534,6 +541,7 @@ function scanComponents(root, appDir, pagesDir) {
 
 // src/config/packages.ts
 var import_node_fs5 = __toESM(require("fs"), 1);
+var import_node_https = __toESM(require("https"), 1);
 var import_node_path5 = __toESM(require("path"), 1);
 var import_node_module3 = require("module");
 var latestCache = /* @__PURE__ */ new Map();
@@ -546,10 +554,11 @@ function readJson2(file) {
   }
 }
 function installedVersion2(root, name) {
-  const direct = readJson2(import_node_path5.default.join(root, "node_modules", name, "package.json"))?.version;
+  var _a, _b;
+  const direct = (_a = readJson2(import_node_path5.default.join(root, "node_modules", name, "package.json"))) == null ? void 0 : _a.version;
   if (direct) return direct;
   try {
-    return readJson2((0, import_node_module3.createRequire)(import_node_path5.default.join(root, "package.json")).resolve(`${name}/package.json`))?.version;
+    return (_b = readJson2((0, import_node_module3.createRequire)(import_node_path5.default.join(root, "package.json")).resolve(`${name}/package.json`))) == null ? void 0 : _b.version;
   } catch {
     return void 0;
   }
@@ -564,19 +573,40 @@ function updateType(installed, latest) {
   if (x === a && y === b && z > c) return "patch";
   return void 0;
 }
+function getJson(url) {
+  if (typeof fetch === "function" && typeof AbortController === "function") {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5e3);
+    return fetch(url, { signal: ctrl.signal, headers: { accept: "application/json" } }).then((r) => r.ok ? r.json() : null).finally(() => clearTimeout(t));
+  }
+  return new Promise((resolve, reject) => {
+    const req2 = import_node_https.default.get(url, { headers: { accept: "application/json" }, timeout: 5e3 }, (res) => {
+      if (res.statusCode !== 200) {
+        res.resume();
+        return resolve(null);
+      }
+      let data = "";
+      res.setEncoding("utf8");
+      res.on("data", (c) => data += c);
+      res.on("end", () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+    req2.on("timeout", () => req2.destroy(new Error("timeout")));
+    req2.on("error", reject);
+  });
+}
 async function fetchLatest(name) {
   const hit = latestCache.get(name);
   if (hit && Date.now() - hit.at < TTL) return hit.version;
   let version = null;
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 5e3);
-    const res = await fetch(`https://registry.npmjs.org/${name.replace("/", "%2F")}/latest`, {
-      signal: ctrl.signal,
-      headers: { accept: "application/json" }
-    });
-    clearTimeout(t);
-    if (res.ok) version = (await res.json()).version ?? null;
+    const body = await getJson(`https://registry.npmjs.org/${name.replace("/", "%2F")}/latest`);
+    version = (body == null ? void 0 : body.version) ?? null;
   } catch {
     version = null;
   }
@@ -773,7 +803,7 @@ function startDevtoolsServer(opts) {
           return send(res, 404, { error: "not found" });
       }
     } catch (err) {
-      return send(res, 500, { error: String(err?.message || err) });
+      return send(res, 500, { error: String((err == null ? void 0 : err.message) || err) });
     }
   });
   server.on("error", (err) => {
@@ -793,28 +823,50 @@ var PHASE_DEVELOPMENT_SERVER = "phase-development-server";
 var DEFAULT_PORT = 4590;
 var here = typeof __dirname !== "undefined" ? __dirname : import_node_path8.default.dirname((0, import_node_url.fileURLToPath)(importMetaUrl));
 var LOADER_PATH = import_node_path8.default.join(here, "loader.cjs");
-function nextMajorMinor(root) {
+function majorMinorOf(root, pkg, fallback) {
   try {
-    const v = (0, import_node_module5.createRequire)(import_node_path8.default.join(root, "package.json"))("next/package.json").version;
+    const v = (0, import_node_module5.createRequire)(import_node_path8.default.join(root, "package.json"))(`${pkg}/package.json`).version;
     const [maj, min] = v.split(".").map(Number);
     return [maj || 0, min || 0];
   } catch {
-    return [16, 0];
+    return fallback;
   }
 }
-function addWebpackRule(config, root) {
+var ROOT_MODERN = /[\\/]dist[\\/]client[\\/]root\.js$/;
+var ROOT_LEGACY = import_node_path8.default.join(here, "client", "root-legacy.js");
+var LegacyReactRootPlugin = class {
+  apply(compiler) {
+    compiler.hooks.normalModuleFactory.tap("NextDevtoolsLegacyRoot", (nmf) => {
+      nmf.hooks.afterResolve.tap("NextDevtoolsLegacyRoot", (data) => {
+        const target = (data == null ? void 0 : data.createData) ?? data;
+        if ((target == null ? void 0 : target.resource) && ROOT_MODERN.test(target.resource)) {
+          target.resource = ROOT_LEGACY;
+          if (target.userRequest) target.userRequest = ROOT_LEGACY;
+        }
+        return data && !data.createData ? data : void 0;
+      });
+    });
+  }
+};
+function addWebpackRule(config, root, inspector, legacyReact) {
   const userWebpack = config.webpack;
   config.webpack = (webpackConfig, ctx) => {
     const result = typeof userWebpack === "function" ? userWebpack(webpackConfig, ctx) : webpackConfig;
-    if (ctx?.dev) {
-      result.module = result.module || {};
-      result.module.rules = result.module.rules || [];
-      result.module.rules.unshift({
-        test: /\.(jsx|tsx|js|mjs)$/,
-        exclude: /[\\/]node_modules[\\/]/,
-        enforce: "pre",
-        use: [{ loader: LOADER_PATH, options: { root } }]
-      });
+    if (ctx == null ? void 0 : ctx.dev) {
+      if (inspector) {
+        result.module = result.module || {};
+        result.module.rules = result.module.rules || [];
+        result.module.rules.unshift({
+          test: /\.(jsx|tsx|js|mjs)$/,
+          exclude: /[\\/]node_modules[\\/]/,
+          enforce: "pre",
+          use: [{ loader: LOADER_PATH, options: { root } }]
+        });
+      }
+      if (legacyReact) {
+        result.plugins = result.plugins || [];
+        result.plugins.push(new LegacyReactRootPlugin());
+      }
     }
     return result;
   };
@@ -832,9 +884,12 @@ function addTurbopackRules(config, root, [major, minor]) {
     }
     return;
   }
-  const target = major > 15 || major === 15 && minor >= 3 ? config.turbopack = config.turbopack || {} : (config.experimental = config.experimental || {}, config.experimental.turbo = config.experimental.turbo || {});
+  if (major < 14) return;
+  const stable = major > 15 || major === 15 && minor >= 3;
+  const target = stable ? config.turbopack = config.turbopack || {} : (config.experimental = config.experimental || {}, config.experimental.turbo = config.experimental.turbo || {});
   const rules = target.rules = target.rules || {};
-  for (const glob of ["*.tsx", "*.jsx"]) {
+  const globs = major === 14 ? ["*.jsx"] : ["*.tsx", "*.jsx"];
+  for (const glob of globs) {
     if (rules[glob]) {
       console.warn(`[next-devtools] a Turbopack rule for "${glob}" already exists; inspector source mapping is disabled for those files.`);
       continue;
@@ -843,8 +898,7 @@ function addTurbopackRules(config, root, [major, minor]) {
   }
 }
 function withNextDevtools(nextConfig = {}, options = {}) {
-  return async (phase, ctx) => {
-    const resolved = typeof nextConfig === "function" ? await nextConfig(phase, ctx) : { ...nextConfig };
+  const apply = (phase, resolved) => {
     if (phase !== PHASE_DEVELOPMENT_SERVER || options.enabled === false || process.env.NEXT_DEVTOOLS === "0") {
       return resolved;
     }
@@ -854,18 +908,24 @@ function withNextDevtools(nextConfig = {}, options = {}) {
     const port = Number(options.port ?? process.env.NEXT_DEVTOOLS_PORT ?? DEFAULT_PORT);
     const token = getOrCreateToken(root);
     const pageExtensions = config.pageExtensions ?? ["tsx", "ts", "jsx", "js"];
+    const [reactMajor] = majorMinorOf(root, "react", [19, 0]);
     config.env = {
       ...config.env || {},
       NEXT_DEVTOOLS_PORT: String(port),
       NEXT_DEVTOOLS_TOKEN: token,
       NEXT_DEVTOOLS_ROOT: root
     };
-    if (options.inspector !== false) {
-      addWebpackRule(config, root);
-      addTurbopackRules(config, root, nextMajorMinor(root));
-    }
+    addWebpackRule(config, root, options.inspector !== false, reactMajor < 18);
+    if (options.inspector !== false) addTurbopackRules(config, root, majorMinorOf(root, "next", [16, 0]));
     startDevtoolsServer({ root, port, token, editor: options.editor, pageExtensions });
     return config;
+  };
+  return (phase, ctx) => {
+    const resolved = typeof nextConfig === "function" ? nextConfig(phase, ctx) : { ...nextConfig };
+    if (resolved && typeof resolved.then === "function") {
+      return resolved.then((c) => apply(phase, c));
+    }
+    return apply(phase, resolved);
   };
 }
 var config_default = withNextDevtools;

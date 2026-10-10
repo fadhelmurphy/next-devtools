@@ -7,6 +7,7 @@ import {
   isComponentFiber,
   nodeElements,
   onCommit,
+  ownerOfElement,
   preview,
   propsOf,
   sourceOfNode,
@@ -27,7 +28,7 @@ interface Indexed {
 const MAX_ROWS = 4000;
 
 function RuntimeTree({ mode }: { mode: React.ReactNode }) {
-  const { pendingReveal, clearReveal, startPick, picking, open } = useDevtools();
+  const { pendingReveal, clearReveal, startPick, picking, open, toast } = useDevtools();
   const { hideInternals } = useSettings();
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
@@ -53,11 +54,20 @@ function RuntimeTree({ mode }: { mode: React.ReactNode }) {
   useEffect(() => {
     if (!pendingReveal || !tree.length) return;
     const fiber = getFiberFromNode(pendingReveal);
-    let hit: Indexed | undefined;
+    // Same owner the inspector tooltip names, then anything indexed up the tree.
+    const owner = ownerOfElement(pendingReveal)?.owner;
+    let hit: Indexed | undefined = owner ? index.get(idOf(owner)) : undefined;
     for (let o = fiber?._debugOwner; o && !hit; o = o._debugOwner ?? o.owner) hit = index.get(idOf(o));
-    for (let f = fiber; f && !hit; f = f.return) if (isComponentFiber(f)) hit = index.get(idOf(f));
+    for (let f = fiber; f && !hit; f = f.return) {
+      if (isComponentFiber(f)) hit = index.get(idOf(f));
+      const infos = f._debugInfo;
+      if (!hit && Array.isArray(infos)) for (let i = infos.length - 1; i >= 0 && !hit; i--) if (infos[i]) hit = index.get(idOf(infos[i]));
+    }
     clearReveal();
-    if (!hit) return;
+    if (!hit) {
+      toast("Rendered by a Server Component. Server Components show in the tree from React 19 (Next.js 14.2+); the inspector still opens its source.");
+      return;
+    }
     const found = hit;
     setSelected(found.node.id);
     setCollapsed((c) => {
@@ -66,7 +76,7 @@ function RuntimeTree({ mode }: { mode: React.ReactNode }) {
       return next;
     });
     requestAnimationFrame(() => rowRefs.current.get(found.node.id)?.scrollIntoView({ block: "center" }));
-  }, [pendingReveal, tree, index, clearReveal]);
+  }, [pendingReveal, tree, index, clearReveal, toast]);
 
   // Flatten for rendering; search keeps matches and their ancestors.
   const { rows, matches } = useMemo(() => {

@@ -6,6 +6,7 @@ import { formatBytes } from "./Assets.js";
 const KIND_LABEL = {
     rsc: "RSC",
     action: "Server Action",
+    data: "Page data",
     api: "API",
     fetch: "Fetch",
     external: "External",
@@ -16,6 +17,7 @@ const FILTERS = [
     { id: "all", label: "All" },
     { id: "rsc", label: "RSC" },
     { id: "action", label: "Actions" },
+    { id: "data", label: "Page data" },
     { id: "api", label: "API" },
     { id: "fetch", label: "Fetch" },
     { id: "external", label: "External" },
@@ -32,7 +34,7 @@ function tryJson(text) {
     try {
         return JSON.parse(text);
     }
-    catch {
+    catch (_a) {
         return undefined;
     }
 }
@@ -41,7 +43,7 @@ const shortUrl = (url) => {
         const u = new URL(url, location.href);
         return u.origin === location.origin ? u.pathname + u.search : u.host + u.pathname;
     }
-    catch {
+    catch (_a) {
         return url;
     }
 };
@@ -60,7 +62,10 @@ export function Network() {
             .reverse();
     }, [entries, filter, showNext, q]);
     const sel = entries.find((e) => e.id === selected);
-    return (_jsxs("div", { className: "nd-split", children: [_jsxs("section", { className: "nd-pane", "aria-label": "Requests", children: [_jsxs("div", { className: "nd-pane-bar", children: [_jsx("input", { className: "nd-input", placeholder: "Filter by URL", value: q, onChange: (e) => setQ(e.target.value), "aria-label": "Filter requests" }), _jsx("button", { className: "nd-btn", onClick: () => (clearEntries(), setSelected(null)), children: "Clear" })] }), _jsxs("div", { className: "nd-pane-bar", style: { paddingTop: 6, paddingBottom: 6 }, children: [_jsx("div", { className: "nd-seg", role: "group", "aria-label": "Request type", children: FILTERS.map((f) => (_jsx("button", { "aria-pressed": filter === f.id, onClick: () => setFilter(f.id), children: f.label }, f.id))) }), _jsxs("label", { className: "nd-check", children: [_jsx("input", { type: "checkbox", checked: showNext, onChange: (e) => setShowNext(e.target.checked) }), "Next.js internals"] })] }), _jsx("div", { className: "nd-pane-body", style: { paddingTop: 0 }, children: !list.length ? (_jsxs("div", { className: "nd-empty", style: { padding: "20px 14px" }, children: [_jsx("strong", { children: "No requests yet" }), "Client navigations, Server Actions, route handlers and fetch() calls from the browser show up here as they happen."] })) : (_jsx("table", { className: "nd-table nd-net", children: _jsx("tbody", { children: list.map((e) => (_jsxs("tr", { "aria-selected": e.id === selected, onClick: () => setSelected(e.id), "data-kind": e.kind, children: [_jsx("td", { style: { width: 1 }, children: _jsx("span", { className: `nd-badge nd-kind-${e.kind}`, children: KIND_LABEL[e.kind] }) }), _jsx("td", { className: "nd-mono nd-net-url", title: e.url, children: e.kind === "navigation" ? _jsxs(_Fragment, { children: [e.requestHeaders?.from, " \u2192 ", e.url] }) : _jsxs(_Fragment, { children: [e.method !== "GET" && _jsxs("b", { children: [e.method, " "] }), shortUrl(e.url)] }) }), _jsx("td", { className: "nd-mono", style: { width: 1, textAlign: "right" }, children: e.kind === "navigation" ? "" : e.error ? _jsx("span", { style: { color: "var(--bad)" }, children: "failed" }) : e.status ?? _jsx("span", { className: "nd-faint", children: "\u2026" }) }), _jsx("td", { className: "nd-mono nd-faint", style: { width: 1, textAlign: "right", whiteSpace: "nowrap" }, children: e.duration != null ? `${Math.round(e.duration)} ms` : "" })] }, e.id))) }) })) })] }), _jsx("section", { className: "nd-pane", "aria-label": "Request details", children: _jsx("div", { className: "nd-pane-body", children: sel ? _jsx(Details, { e: sel }) : _jsxs("div", { className: "nd-empty", style: { padding: "20px 16px" }, children: [_jsx("strong", { children: "Select a request" }), "See headers, payload and the response."] }) }) })] }));
+    return (_jsxs("div", { className: "nd-split", children: [_jsxs("section", { className: "nd-pane", "aria-label": "Requests", children: [_jsxs("div", { className: "nd-pane-bar", children: [_jsx("input", { className: "nd-input", placeholder: "Filter by URL", value: q, onChange: (e) => setQ(e.target.value), "aria-label": "Filter requests" }), _jsx("button", { className: "nd-btn", onClick: () => (clearEntries(), setSelected(null)), children: "Clear" })] }), _jsxs("div", { className: "nd-pane-bar", style: { paddingTop: 6, paddingBottom: 6 }, children: [_jsx("div", { className: "nd-seg", role: "group", "aria-label": "Request type", children: FILTERS.map((f) => (_jsx("button", { "aria-pressed": filter === f.id, onClick: () => setFilter(f.id), children: f.label }, f.id))) }), _jsxs("label", { className: "nd-check", children: [_jsx("input", { type: "checkbox", checked: showNext, onChange: (e) => setShowNext(e.target.checked) }), "Next.js internals"] })] }), _jsx("div", { className: "nd-pane-body", style: { paddingTop: 0 }, children: !list.length ? (_jsxs("div", { className: "nd-empty", style: { padding: "20px 14px" }, children: [_jsx("strong", { children: "No requests yet" }), "Client navigations, Server Actions, getServerSideProps data, route handlers and fetch() calls from the browser show up here as they happen."] })) : (_jsx("table", { className: "nd-table nd-net", children: _jsx("tbody", { children: list.map((e) => {
+                                    var _a, _b;
+                                    return (_jsxs("tr", { "aria-selected": e.id === selected, onClick: () => setSelected(e.id), "data-kind": e.kind, children: [_jsx("td", { style: { width: 1 }, children: _jsx("span", { className: `nd-badge nd-kind-${e.kind}`, children: KIND_LABEL[e.kind] }) }), _jsx("td", { className: "nd-mono nd-net-url", title: e.url, children: e.kind === "navigation" ? _jsxs(_Fragment, { children: [(_a = e.requestHeaders) === null || _a === void 0 ? void 0 : _a.from, " \u2192 ", e.url] }) : _jsxs(_Fragment, { children: [e.method !== "GET" && _jsxs("b", { children: [e.method, " "] }), shortUrl(e.url)] }) }), _jsx("td", { className: "nd-mono", style: { width: 1, textAlign: "right" }, children: e.kind === "navigation" ? "" : e.error ? _jsx("span", { style: { color: "var(--bad)" }, children: "failed" }) : (_b = e.status) !== null && _b !== void 0 ? _b : _jsx("span", { className: "nd-faint", children: "\u2026" }) }), _jsx("td", { className: "nd-mono nd-faint", style: { width: 1, textAlign: "right", whiteSpace: "nowrap" }, children: e.duration != null ? `${Math.round(e.duration)} ms` : "" })] }, e.id));
+                                }) }) })) })] }), _jsx("section", { className: "nd-pane", "aria-label": "Request details", children: _jsx("div", { className: "nd-pane-body", children: sel ? _jsx(Details, { e: sel }) : _jsxs("div", { className: "nd-empty", style: { padding: "20px 16px" }, children: [_jsx("strong", { children: "Select a request" }), "See headers, payload and the response."] }) }) })] }));
 }
 function Details({ e }) {
     const reqJson = tryJson(e.requestBody);

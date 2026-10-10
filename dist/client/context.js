@@ -12,12 +12,12 @@ export function useSettings() {
 export function useAsync(fn, deps = []) {
     const [state, setState] = useState({ loading: true });
     const run = useCallback((fresh = false) => {
-        setState((s) => ({ ...s, loading: true }));
+        setState((s) => (Object.assign(Object.assign({}, s), { loading: true })));
         fn(fresh).then((data) => setState({ data, loading: false }), (error) => setState({ error, loading: false }));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, deps);
     useEffect(() => run(false), [run]);
-    return { ...state, reload: () => run(true) };
+    return Object.assign(Object.assign({}, state), { reload: () => run(true) });
 }
 export function ApiErrorBox({ error }) {
     const title = error.reason === "not-configured"
@@ -31,6 +31,6 @@ export function FileLink({ loc, children }) {
     const { open } = useDevtools();
     if (!loc)
         return null;
-    return (_jsx("button", { className: "nd-file", onClick: () => open(loc), title: "Open in editor", children: children ?? `${loc.file}${loc.line > 1 ? `:${loc.line}` : ""}` }));
+    return (_jsx("button", { className: "nd-file", onClick: () => open(loc), title: "Open in editor", children: children !== null && children !== void 0 ? children : `${loc.file}${loc.line > 1 ? `:${loc.line}` : ""}` }));
 }
 export const openLocation = openInEditor;

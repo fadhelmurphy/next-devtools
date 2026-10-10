@@ -2,7 +2,7 @@
 
 A [Nuxt DevTools](https://devtools.nuxt.com)-style panel for **Next.js**. Hover any element to see which component rendered it, click to jump to the exact line in your editor, browse the component tree (Server Components included), every route, your `public/` assets and Web Vitals — without leaving the page.
 
-Works with the **App Router and Pages Router**, **Turbopack and webpack**. Tested on Next.js 15 and 16 (React 19); Next.js 14 is supported on a best-effort basis. Development only: production builds contain none of it.
+Works on **Next.js 10 through 16**, with the **App Router and Pages Router**, **Turbopack and webpack** (4 and 5). Development only: production builds contain none of it.
 
 ![Next DevTools demo: inspecting elements, browsing the component tree, visiting a dynamic route and checking Web Vitals](docs/demo.gif)
 
@@ -29,16 +29,32 @@ Works with the **App Router and Pages Router**, **Turbopack and webpack**. Teste
 
 | | Required | Notes |
 |---|---|---|
-| **Next.js** | 14.0 or newer | Tested on 15.5 and 16.3. Next 16 gets the full Turbopack integration (rules skip `node_modules`); on 14/15 a `*.tsx` / `*.jsx` Turbopack rule you already have takes precedence. |
-| **React / React DOM** | 18.2 or newer | **Server Components in the tree need React 19** (it's what Next's App Router ships). On React 18 you still get the inspector, client components, props and state. |
-| **Node.js** | 18.18 or newer | Whatever your Next.js needs wins: Next 15 runs on 18.18+, Next 16 needs 20.9+. |
+| **Next.js** | 10.0 or newer | See the version table below. |
+| **React / React DOM** | 17 or newer | **Server Components in the tree need React 19 dev builds** — what the App Router ships from Next 14.2 on. Earlier, you still get the inspector (with file and line), client components, props and state. |
+| **Node.js** | 14.18 or newer | Whatever your Next.js needs wins (Next 15: 18.18+, Next 16: 20.9+). |
 | **Mode** | `next dev` only | Nothing is added to `next build` / `next start`. |
-| **Bundler** | Turbopack or webpack | Both are configured automatically (`next dev`, `next dev --turbopack`, `next dev --webpack`). |
 | **Router** | App Router, Pages Router, or both | Mixed projects are fine; routes from both show up. |
 | **Browser** | Any current Chromium, Firefox or Safari | Needs Shadow DOM and `PerformanceObserver`. INP is only reported by Chromium browsers. |
 | **Local port** | `4590` free on `127.0.0.1` | Used by the local API (routes, assets, open-in-editor). Change it with the `port` option. |
-| **Editor** (optional) | VS Code, Cursor, Windsurf, Zed, WebStorm, Sublime, Vim… | Auto-detected from running processes, or set `LAUNCH_EDITOR` / the `editor` option. URL schemes work without any CLI on your `PATH`. |
+| **Editor** (optional) | VS Code, Cursor, Windsurf, Zed, WebStorm, Sublime… | Found from running processes or your `PATH`, or set `LAUNCH_EDITOR` / the `editor` option. URL schemes work without any CLI. |
 | **Package manager** | npm, pnpm, yarn or bun | No postinstall scripts, three small runtime dependencies (`@babel/parser`, `magic-string`, `launch-editor`). |
+
+### Tested versions
+
+Each row was run in a real app: `next dev` plus a browser test of the inspector, panel, component tree, live state, routes, client navigation, payload and network, and `next build` checked for leftover DevTools code.
+
+| Next.js | React | Node | Bundler | Router | Notes |
+|---|---|---|---|---|---|
+| 10.2 | 17 | 14, 22 | webpack 4 | Pages | On Node 17+, Next 10 itself needs `NODE_OPTIONS=--openssl-legacy-provider`. |
+| 11.1 | 17 | 14, 22 | webpack 5 | Pages | |
+| 12.3 | 17 | 16, 22 | webpack 5 (SWC) | Pages | |
+| 13.5 | 18 | 22 | webpack 5 | Pages, App | No Server Components in the tree (React 18 doesn't record them); picking one explains that. |
+| 14.2 | 18 | 22 | webpack 5, Turbopack | App | `next dev --turbo` tags only `.jsx` files: Next 14's Turbopack can't run a loader on `.tsx` without breaking `"use client"` imports. Use the default webpack dev server for full file/line info. |
+| 15.2 | 19 | 22 | Turbopack | App | |
+| 15.5 | 19 | 22 | webpack, Turbopack | App | |
+| 16.3 | 19 | 22 | webpack, Turbopack | App, Pages | |
+
+Next.js 10 and 11 can't load `next.config.ts` or `next.config.mjs`; use `next.config.js` with `require()` there (the `init` command does). The `<Link><a>…</a></Link>` style of those versions is fine.
 
 Not supported: React Native / Expo, standalone Vite or CRA apps (this package hooks into `next.config`), and opening files when the browser runs on a different machine than `next dev` (the local API listens on `127.0.0.1`; use an editor URL scheme in Settings instead).
 
@@ -79,7 +95,7 @@ const nextConfig: NextConfig = {
 export default withNextDevtools(nextConfig);
 ```
 
-`next.config.js` (CommonJS) works too: `const { withNextDevtools } = require("@fadhelmurphy/next-devtools")`. Function configs (`(phase) => config`) are supported.
+`next.config.js` (CommonJS) works too: `const { withNextDevtools } = require("@fadhelmurphy/next-devtools")` — the only option on Next 10/11. Function configs (`(phase) => config`) are supported, async ones too on Next 12.1+.
 
 **2. Render the panel once**
 
@@ -160,6 +176,8 @@ export default withNextDevtools(nextConfig, {
 **WSL** — run `next dev` inside WSL and the browser on Windows as usual. With the VS Code / Cursor `code` command on your WSL `PATH` files open directly. Otherwise the `vscode://` fallback opens `/mnt/c/…` projects as Windows paths and projects inside the Linux filesystem through the WSL remote (`vscode-remote/wsl+<distro>`).
 
 **A Turbopack rule for `*.tsx` already exists (Next 14/15)** — older Next versions allow one rule per glob, so DevTools skips the inspector for those files and warns. Next 16 merges rules.
+
+**`ERR_OSSL_EVP_UNSUPPORTED` on Next 10/11** — that's webpack 4/5 hashing on Node 17+, not DevTools. Run `NODE_OPTIONS=--openssl-legacy-provider next dev`, or use Node 16.
 
 **`tsup: not found` / package missing after install** — your shell probably has `NODE_ENV=production`, which makes npm skip dev dependencies. Use `npm i -D --include=dev github:fadhelmurphy/next-devtools` (the `init` command already does), or `unset NODE_ENV`. When working on this repo itself, run `npm install --include=dev`.
 

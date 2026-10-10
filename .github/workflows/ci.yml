@@ -26,3 +26,44 @@ jobs:
           npm install
           npx next build
           if grep -rq "data-nd-src" .next/static .next/server/app; then echo "devtools leaked into production" && exit 1; fi
+
+  compat:
+    name: Next ${{ matrix.next }} / Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { next: "10.2.3", react: "17.0.2", node: 14 }
+          - { next: "11.1.4", react: "17.0.2", node: 14 }
+          - { next: "12.3.4", react: "17.0.2", node: 16 }
+          - { next: "13.5.11", react: "18.3.1", node: 18 }
+          - { next: "14.2.35", react: "18.3.1", node: 20 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Pack the committed dist/
+        run: npm pack --pack-destination "$RUNNER_TEMP"
+      - name: Create app
+        run: bash scripts/compat-app.sh "$RUNNER_TEMP/app" ${{ matrix.next }} ${{ matrix.react }} "$(ls $RUNNER_TEMP/*.tgz)"
+      - name: Install
+        working-directory: ${{ runner.temp }}/app
+        run: npm install --no-audit --no-fund
+      - name: next dev serves pages with source locations
+        working-directory: ${{ runner.temp }}/app
+        run: |
+          npx next dev -p 3000 > dev.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf localhost:3000/ -o /dev/null && break; sleep 2; done
+          curl -sf localhost:3000/posts/1 -o page.html || (cat dev.log; exit 1)
+          grep -q 'data-nd-src="pages/posts/\[id\].js' page.html || (cat dev.log; exit 1)
+          curl -sf localhost:4590/ping
+          ! grep -E "ERR_REQUIRE_ESM|Error:" dev.log
+      - name: next build has no DevTools code
+        working-directory: ${{ runner.temp }}/app
+        run: |
+          pkill -f "next dev" || true
+          npx next build
+          ! grep -rqE "data-nd-src|nd-panel|NEXT_DEVTOOLS_TOKEN" .next/static .next/server

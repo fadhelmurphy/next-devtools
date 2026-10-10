@@ -1,14 +1,14 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDevtools, useSettings, FileLink } from "../context.js";
-import { buildTree, getFiberFromNode, idOf, isComponentFiber, nodeElements, onCommit, preview, propsOf, sourceOfNode, stateOf, walkTree, } from "../fiber.js";
+import { buildTree, getFiberFromNode, idOf, isComponentFiber, nodeElements, onCommit, ownerOfElement, preview, propsOf, sourceOfNode, stateOf, walkTree, } from "../fiber.js";
 import { IconChevron, IconInspect, IconOpen, IconRefresh } from "../icons.js";
 import { ProjectComponents } from "./ProjectComponents.js";
 import { hideHighlight, highlight } from "../overlay.js";
 import { updateSettings } from "../settings.js";
 const MAX_ROWS = 4000;
 function RuntimeTree({ mode }) {
-    const { pendingReveal, clearReveal, startPick, picking, open } = useDevtools();
+    const { pendingReveal, clearReveal, startPick, picking, open, toast } = useDevtools();
     const { hideInternals } = useSettings();
     const [tree, setTree] = useState([]);
     const [selected, setSelected] = useState(null);
@@ -30,18 +30,29 @@ function RuntimeTree({ mode }) {
     }, [tree]);
     // Reveal a component picked on the page
     useEffect(() => {
+        var _a, _b;
         if (!pendingReveal || !tree.length)
             return;
         const fiber = getFiberFromNode(pendingReveal);
-        let hit;
-        for (let o = fiber?._debugOwner; o && !hit; o = o._debugOwner ?? o.owner)
+        // Same owner the inspector tooltip names, then anything indexed up the tree.
+        const owner = (_a = ownerOfElement(pendingReveal)) === null || _a === void 0 ? void 0 : _a.owner;
+        let hit = owner ? index.get(idOf(owner)) : undefined;
+        for (let o = fiber === null || fiber === void 0 ? void 0 : fiber._debugOwner; o && !hit; o = (_b = o._debugOwner) !== null && _b !== void 0 ? _b : o.owner)
             hit = index.get(idOf(o));
-        for (let f = fiber; f && !hit; f = f.return)
+        for (let f = fiber; f && !hit; f = f.return) {
             if (isComponentFiber(f))
                 hit = index.get(idOf(f));
+            const infos = f._debugInfo;
+            if (!hit && Array.isArray(infos))
+                for (let i = infos.length - 1; i >= 0 && !hit; i--)
+                    if (infos[i])
+                        hit = index.get(idOf(infos[i]));
+        }
         clearReveal();
-        if (!hit)
+        if (!hit) {
+            toast("Rendered by a Server Component. Server Components show in the tree from React 19 (Next.js 14.2+); the inspector still opens its source.");
             return;
+        }
         const found = hit;
         setSelected(found.node.id);
         setCollapsed((c) => {
@@ -49,8 +60,8 @@ function RuntimeTree({ mode }) {
             found.parents.forEach((p) => next.delete(p.id));
             return next;
         });
-        requestAnimationFrame(() => rowRefs.current.get(found.node.id)?.scrollIntoView({ block: "center" }));
-    }, [pendingReveal, tree, index, clearReveal]);
+        requestAnimationFrame(() => { var _a; return (_a = rowRefs.current.get(found.node.id)) === null || _a === void 0 ? void 0 : _a.scrollIntoView({ block: "center" }); });
+    }, [pendingReveal, tree, index, clearReveal, toast]);
     // Flatten for rendering; search keeps matches and their ancestors.
     const { rows, matches } = useMemo(() => {
         const needle = q.trim().toLowerCase();
@@ -91,15 +102,16 @@ function RuntimeTree({ mode }) {
             return;
         const i = rows.findIndex((r) => r.node.id === selected);
         const move = (to) => {
+            var _a;
             const r = rows[Math.max(0, Math.min(rows.length - 1, to))];
             setSelected(r.node.id);
-            rowRefs.current.get(r.node.id)?.scrollIntoView({ block: "nearest" });
+            (_a = rowRefs.current.get(r.node.id)) === null || _a === void 0 ? void 0 : _a.scrollIntoView({ block: "nearest" });
         };
         if (e.key === "ArrowDown")
             move(i + 1);
         else if (e.key === "ArrowUp")
             move(i - 1);
-        else if (e.key === "ArrowRight" && sel?.node.children.length)
+        else if (e.key === "ArrowRight" && (sel === null || sel === void 0 ? void 0 : sel.node.children.length))
             setCollapsed((c) => (c.delete(sel.node.id), new Set(c)));
         else if (e.key === "ArrowLeft" && sel) {
             if (sel.node.children.length && !collapsed.has(sel.node.id))
@@ -126,13 +138,14 @@ function RuntimeTree({ mode }) {
 }
 const NoSelection = () => (_jsxs("div", { className: "nd-empty", style: { padding: "20px 16px" }, children: [_jsx("strong", { children: "Select a component" }), "Pick one from the tree, or use the crosshair to click an element on the page."] }));
 function Details({ item, onSelect }) {
+    var _a;
     const { open } = useDevtools();
     const { node, parents } = item;
     const source = sourceOfNode(node);
     const props = propsOf(node);
     const state = stateOf(node);
     const elements = nodeElements(node);
-    return (_jsxs("div", { className: "nd-detail", children: [parents.length > 0 && (_jsx("div", { className: "nd-crumbs", style: { marginBottom: 8 }, children: parents.slice(-4).map((p) => (_jsxs("span", { children: [_jsx("button", { onClick: () => onSelect(p.id), children: p.name }), " \u203A"] }, p.id))) })), _jsxs("h3", { children: [node.name, _jsx("span", { className: `nd-badge ${node.kind === "server" ? "nd-badge-server" : "nd-badge-client"}`, children: node.kind === "server" ? `Server${node.env && node.env !== "Server" ? ` (${node.env})` : ""}` : "Client" })] }), _jsxs("div", { style: { marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }, children: [source ? (_jsxs(_Fragment, { children: [_jsxs("button", { className: "nd-btn nd-btn-primary", onClick: () => open(source), children: [_jsx(IconOpen, {}), " Open in editor"] }), _jsx(FileLink, { loc: source })] })) : (_jsx("span", { className: "nd-faint", children: "Source unknown \u2014 it renders no DOM of its own" })), elements.length > 0 && (_jsx("button", { className: "nd-link", onClick: () => elements[0].scrollIntoView({ block: "center", behavior: "smooth" }), children: "Scroll to" }))] }), _jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "Props" }), Object.keys(props).length ? (_jsx("table", { className: "nd-props", children: _jsx("tbody", { children: Object.entries(props).map(([k, v]) => (_jsxs("tr", { children: [_jsx("td", { children: k }), _jsx("td", { children: preview(v) })] }, k))) }) })) : (_jsx("span", { className: "nd-faint", children: node.kind === "server" && !node.info?.props ? "Not available for this React version" : "None" }))] }), node.kind === "client" && (_jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "State" }), state.length ? (_jsx("table", { className: "nd-props", children: _jsx("tbody", { children: state.map((v, i) => (_jsxs("tr", { children: [_jsx("td", { children: state.length === 1 && node.fibers[0].tag === 1 ? "this.state" : `state ${i + 1}` }), _jsx("td", { children: preview(v) })] }, i))) }) })) : (_jsx("span", { className: "nd-faint", children: "Stateless" }))] })), _jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "Renders" }), _jsxs("span", { className: "nd-muted", children: [elements.length, " DOM ", elements.length === 1 ? "element" : "elements", node.children.length ? `, ${node.children.length} child ${node.children.length === 1 ? "component" : "components"}` : ""] })] })] }));
+    return (_jsxs("div", { className: "nd-detail", children: [parents.length > 0 && (_jsx("div", { className: "nd-crumbs", style: { marginBottom: 8 }, children: parents.slice(-4).map((p) => (_jsxs("span", { children: [_jsx("button", { onClick: () => onSelect(p.id), children: p.name }), " \u203A"] }, p.id))) })), _jsxs("h3", { children: [node.name, _jsx("span", { className: `nd-badge ${node.kind === "server" ? "nd-badge-server" : "nd-badge-client"}`, children: node.kind === "server" ? `Server${node.env && node.env !== "Server" ? ` (${node.env})` : ""}` : "Client" })] }), _jsxs("div", { style: { marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }, children: [source ? (_jsxs(_Fragment, { children: [_jsxs("button", { className: "nd-btn nd-btn-primary", onClick: () => open(source), children: [_jsx(IconOpen, {}), " Open in editor"] }), _jsx(FileLink, { loc: source })] })) : (_jsx("span", { className: "nd-faint", children: "Source unknown \u2014 it renders no DOM of its own" })), elements.length > 0 && (_jsx("button", { className: "nd-link", onClick: () => elements[0].scrollIntoView({ block: "center", behavior: "smooth" }), children: "Scroll to" }))] }), _jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "Props" }), Object.keys(props).length ? (_jsx("table", { className: "nd-props", children: _jsx("tbody", { children: Object.entries(props).map(([k, v]) => (_jsxs("tr", { children: [_jsx("td", { children: k }), _jsx("td", { children: preview(v) })] }, k))) }) })) : (_jsx("span", { className: "nd-faint", children: node.kind === "server" && !((_a = node.info) === null || _a === void 0 ? void 0 : _a.props) ? "Not available for this React version" : "None" }))] }), node.kind === "client" && (_jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "State" }), state.length ? (_jsx("table", { className: "nd-props", children: _jsx("tbody", { children: state.map((v, i) => (_jsxs("tr", { children: [_jsx("td", { children: state.length === 1 && node.fibers[0].tag === 1 ? "this.state" : `state ${i + 1}` }), _jsx("td", { children: preview(v) })] }, i))) }) })) : (_jsx("span", { className: "nd-faint", children: "Stateless" }))] })), _jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "Renders" }), _jsxs("span", { className: "nd-muted", children: [elements.length, " DOM ", elements.length === 1 ? "element" : "elements", node.children.length ? `, ${node.children.length} child ${node.children.length === 1 ? "component" : "components"}` : ""] })] })] }));
 }
 export function Components() {
     const [mode, setMode] = useState("page");

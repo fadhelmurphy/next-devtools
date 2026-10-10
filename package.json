@@ -1,7 +1,7 @@
 {
   "name": "@fadhelmurphy/next-devtools",
-  "version": "0.2.0",
-  "description": "Nuxt DevTools-style developer panel for Next.js \u2014 component inspector, click-to-open-in-editor, routes, components tree (incl. Server Components), assets and Web Vitals. Works with App Router and Pages Router, Turbopack and webpack.",
+  "version": "0.3.0",
+  "description": "Nuxt DevTools-style developer panel for Next.js 10+: component inspector with click-to-open-in-editor, component tree (incl. Server Components), routes, packages, config, payload, network, assets and Web Vitals. App Router and Pages Router, Turbopack and webpack.",
   "license": "MIT",
   "author": "Fadhel Ijlal Falah",
   "repository": {
@@ -22,6 +22,7 @@
   "sideEffects": false,
   "files": [
     "dist",
+    "client",
     "README.md",
     "LICENSE"
   ],
@@ -41,6 +42,8 @@
     },
     "./client": {
       "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js",
+      "require": "./dist/client/index.cjs",
       "default": "./dist/client/index.js"
     },
     "./loader": "./dist/loader.cjs",
@@ -55,9 +58,9 @@
     "check:dist": "npm run build && git diff --exit-code --stat -- dist"
   },
   "peerDependencies": {
-    "next": ">=14.0.0",
-    "react": ">=18.2.0",
-    "react-dom": ">=18.2.0"
+    "next": ">=10.0.0",
+    "react": ">=17.0.0",
+    "react-dom": ">=17.0.0"
   },
   "dependencies": {
     "@babel/parser": "^7.29.0",
@@ -73,9 +76,16 @@
     "vitest": "^3.0.0"
   },
   "engines": {
-    "node": ">=18.18"
+    "node": ">=14.18"
   },
   "bin": {
     "next-devtools": "./dist/cli.cjs"
+  },
+  "typesVersions": {
+    "*": {
+      "client": [
+        "./dist/client/index.d.ts"
+      ]
+    }
   }
 }

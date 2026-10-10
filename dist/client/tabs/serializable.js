@@ -1,5 +1,6 @@
 /** Make arbitrary runtime values safe for <JsonTree>: functions, elements, promises, cycles. */
 export function serializable(value, depth = 0, seen = new WeakSet()) {
+    var _a, _b;
     if (value === null || value === undefined)
         return value === null ? null : "undefined";
     const t = typeof value;
@@ -14,7 +15,7 @@ export function serializable(value, depth = 0, seen = new WeakSet()) {
         return "[Circular]";
     seen.add(obj);
     if (obj.$$typeof)
-        return `<${typeof obj.type === "string" ? obj.type : obj.type?.displayName || obj.type?.name || "Component"} />`;
+        return `<${typeof obj.type === "string" ? obj.type : ((_a = obj.type) === null || _a === void 0 ? void 0 : _a.displayName) || ((_b = obj.type) === null || _b === void 0 ? void 0 : _b.name) || "Component"} />`;
     if (typeof obj.then === "function")
         return obj.status === "fulfilled" ? serializable(obj.value, depth + 1, seen) : "Promise";
     if (typeof Element !== "undefined" && obj instanceof Element)

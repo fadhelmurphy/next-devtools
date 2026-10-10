@@ -19,10 +19,11 @@ export function Assets() {
     const [q, setQ] = useState("");
     const [type, setType] = useState("all");
     const list = useMemo(() => {
+        var _a;
         const needle = q.trim().toLowerCase();
-        return (assets.data ?? []).filter((a) => (type === "all" || a.type === type) && (!needle || a.path.toLowerCase().includes(needle)));
+        return ((_a = assets.data) !== null && _a !== void 0 ? _a : []).filter((a) => (type === "all" || a.type === type) && (!needle || a.path.toLowerCase().includes(needle)));
     }, [assets.data, q, type]);
-    const total = useMemo(() => (assets.data ?? []).reduce((s, a) => s + a.size, 0), [assets.data]);
+    const total = useMemo(() => { var _a; return ((_a = assets.data) !== null && _a !== void 0 ? _a : []).reduce((s, a) => s + a.size, 0); }, [assets.data]);
     if (assets.error)
         return _jsx(ApiErrorBox, { error: assets.error });
     const copy = async (a) => {
@@ -30,7 +31,7 @@ export function Assets() {
             await navigator.clipboard.writeText(a.path);
             toast(`Copied ${a.path}`);
         }
-        catch {
+        catch (_a) {
             toast(a.path);
         }
     };

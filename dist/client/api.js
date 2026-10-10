@@ -20,12 +20,9 @@ async function request(path, init) {
     }
     let res;
     try {
-        res = await nativeFetch(`${API_ORIGIN}${path}`, {
-            ...init,
-            headers: { "content-type": "application/json", [TOKEN_HEADER]: TOKEN, ...(init?.headers || {}) },
-        });
+        res = await nativeFetch(`${API_ORIGIN}${path}`, Object.assign(Object.assign({}, init), { headers: Object.assign({ "content-type": "application/json", [TOKEN_HEADER]: TOKEN }, ((init === null || init === void 0 ? void 0 : init.headers) || {})) }));
     }
-    catch {
+    catch (_a) {
         throw new ApiError(`Can't reach the DevTools API on port ${PORT}. Restart next dev, or check that nothing else uses that port.`, "unreachable");
     }
     if (res.status === 401) {
@@ -65,6 +62,7 @@ export function parseSource(value) {
 }
 /** Open a project file in the editor. Returns a short status message for a toast. */
 export async function openInEditor(loc) {
+    var _a;
     const { editor } = getSettings();
     let hints;
     let why = "";
@@ -74,7 +72,7 @@ export async function openInEditor(loc) {
             if (r.ok)
                 return `Opened ${loc.file}:${loc.line}${r.editor ? ` in ${r.editor}` : ""}`;
             hints = r;
-            why = r.reason ?? "";
+            why = (_a = r.reason) !== null && _a !== void 0 ? _a : "";
         }
         catch (e) {
             why = e.message;
@@ -91,14 +89,15 @@ export async function openInEditor(loc) {
 }
 /** Build an editor URL, translating WSL paths so a Windows editor can open them. */
 export function editorUrl(scheme, abs, loc, hints) {
+    var _a;
     const { line, column } = loc;
     const vscodeLike = scheme === "vscode" || scheme === "cursor" || scheme === "windsurf";
-    if (hints?.wsl && !hints.windowsPath && vscodeLike) {
+    if ((hints === null || hints === void 0 ? void 0 : hints.wsl) && !hints.windowsPath && vscodeLike) {
         // File lives inside the Linux filesystem: open it through the WSL remote.
         return `${scheme}://vscode-remote/wsl+${encodeURIComponent(hints.wsl)}${abs}:${line}:${column}`;
     }
     const drive = abs.match(/^\/mnt\/([a-z])\/(.*)$/i);
-    const target = hints?.windowsPath ?? (drive ? `${drive[1].toUpperCase()}:/${drive[2]}` : abs);
+    const target = (_a = hints === null || hints === void 0 ? void 0 : hints.windowsPath) !== null && _a !== void 0 ? _a : (drive ? `${drive[1].toUpperCase()}:/${drive[2]}` : abs);
     const pathPart = target.startsWith("/") ? target.slice(1) : target;
     if (scheme === "webstorm")
         return `webstorm://open?file=${encodeURIComponent(target)}&line=${line}&column=${column}`;

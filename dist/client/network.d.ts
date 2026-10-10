@@ -1,4 +1,4 @@
-export type RequestKind = "rsc" | "action" | "api" | "fetch" | "external" | "next" | "navigation";
+export type RequestKind = "rsc" | "action" | "data" | "api" | "fetch" | "external" | "next" | "navigation";
 export interface NetEntry {
     id: number;
     kind: RequestKind;

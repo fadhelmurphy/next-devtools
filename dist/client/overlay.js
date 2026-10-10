@@ -77,16 +77,18 @@ let active = null;
 let last = null;
 const isOurs = (e) => e.composedPath().some((n) => n.id === HOST_ID);
 function targetOf(e) {
+    var _a;
     const t = e.composedPath()[0];
-    return t instanceof Element ? t : t?.parentElement ?? null;
+    return t instanceof Element ? t : (_a = t === null || t === void 0 ? void 0 : t.parentElement) !== null && _a !== void 0 ? _a : null;
 }
 export function describe(el) {
+    var _a;
     const tagged = el.closest(`[${SOURCE_ATTR}]`);
-    const source = parseSource(tagged?.getAttribute(SOURCE_ATTR));
+    const source = parseSource(tagged === null || tagged === void 0 ? void 0 : tagged.getAttribute(SOURCE_ATTR));
     const owner = ownerOfElement(el);
     return {
-        title: owner?.name ?? el.tagName.toLowerCase(),
-        server: owner?.server,
+        title: (_a = owner === null || owner === void 0 ? void 0 : owner.name) !== null && _a !== void 0 ? _a : el.tagName.toLowerCase(),
+        server: owner === null || owner === void 0 ? void 0 : owner.server,
         tag: el.tagName.toLowerCase(),
         source,
     };
@@ -99,10 +101,7 @@ const onMove = (e) => {
         return;
     last = el;
     const d = describe(el);
-    highlight([el], {
-        ...d,
-        hint: active.mode === "editor" ? (d.source ? "Click to open in editor" : "No source for this element") : "Click to select",
-    });
+    highlight([el], Object.assign(Object.assign({}, d), { hint: active.mode === "editor" ? (d.source ? "Click to open in editor" : "No source for this element") : "Click to select" }));
 };
 const swallow = (e) => {
     if (!active || isOurs(e))
