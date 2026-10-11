@@ -1,5 +1,5 @@
-// Records docs/demo.gif from examples/app-router.
-//   cd examples/app-router && npm install && npx next dev -p 3100
+// Records docs/demo.gif from examples/next-16.
+//   cd examples/next-16 && npm install && npx next dev -p 3100
 //   npm i -D playwright && npx playwright install chromium
 //   node docs/record-demo.mjs   (then the ffmpeg command printed at the end)
 import { chromium } from "playwright";

@@ -6,7 +6,7 @@ Works on **Next.js 10 through 16**, with the **App Router and Pages Router**, **
 
 ![Next DevTools demo: inspecting elements, browsing the component tree, visiting a dynamic route and checking Web Vitals](docs/demo.gif)
 
-<sub>The demo runs <a href="examples/app-router">examples/app-router</a> on Next.js 16 with Turbopack: inspect elements and open their source, browse the tree with Server Components and live state, visit a dynamic route, check the layouts for the current URL, read Web Vitals.</sub>
+<sub>The demo runs <a href="examples/next-16">examples/next-16</a> on Next.js 16 with Turbopack: inspect elements and open their source, browse the tree with Server Components and live state, visit a dynamic route, check the layouts for the current URL, read Web Vitals.</sub>
 
 > Successor of [react-inspector-devtools](https://github.com/fadhelmurphy/react-inspector-devtools). That project needed the React DevTools extension and `_debugSource`, which React 19 removed. This one tags JSX at compile time, so it works on React 18 and 19, in Server Components, with no browser extension.
 
@@ -41,18 +41,18 @@ Works on **Next.js 10 through 16**, with the **App Router and Pages Router**, **
 
 ### Tested versions
 
-Each row was run in a real app: `next dev` plus a browser test of the inspector, panel, component tree, live state, routes, client navigation, payload and network, and `next build` checked for leftover DevTools code.
+Each row was run in a real app — the ones in [`examples/`](examples) — with `next dev` plus a browser test of the inspector, panel, component tree, live state, routes, client navigation, payload and network, and `next build` checked for leftover DevTools code. CI repeats the dev and build checks for every example on every push.
 
 | Next.js | React | Node | Bundler | Router | Notes |
 |---|---|---|---|---|---|
-| 10.2 | 17 | 14, 22 | webpack 4 | Pages | On Node 17+, Next 10 itself needs `NODE_OPTIONS=--openssl-legacy-provider`. |
-| 11.1 | 17 | 14, 22 | webpack 5 | Pages | |
-| 12.3 | 17 | 16, 22 | webpack 5 (SWC) | Pages | |
-| 13.5 | 18 | 22 | webpack 5 | Pages, App | No Server Components in the tree (React 18 doesn't record them); picking one explains that. |
-| 14.2 | 18 | 22 | webpack 5, Turbopack | App | `next dev --turbo` tags only `.jsx` files: Next 14's Turbopack can't run a loader on `.tsx` without breaking `"use client"` imports. Use the default webpack dev server for full file/line info. |
+| [10.2](examples/next-10) | 17 | 14, 22 | webpack 4 | Pages | On Node 17+, Next 10 itself needs `NODE_OPTIONS=--openssl-legacy-provider`. |
+| [11.1](examples/next-11) | 17 | 14, 22 | webpack 5 | Pages | |
+| [12.3](examples/next-12) | 17 | 16, 22 | webpack 5 (SWC) | Pages | |
+| [13.5](examples/next-13) | 18 | 22 | webpack 5 | Pages, App | No Server Components in the tree (React 18 doesn't record them); picking one explains that. |
+| [14.2](examples/next-14) | 18 | 22 | webpack 5, Turbopack | App | `next dev --turbo` tags only `.jsx` files: Next 14's Turbopack can't run a loader on `.tsx` without breaking `"use client"` imports. Use the default webpack dev server for full file/line info. |
 | 15.2 | 19 | 22 | Turbopack | App | |
-| 15.5 | 19 | 22 | webpack, Turbopack | App | |
-| 16.3 | 19 | 22 | webpack, Turbopack | App, Pages | |
+| [15.5](examples/next-15) | 19 | 22 | webpack, Turbopack | App | |
+| 16.3 ([App](examples/next-16), [Pages](examples/next-16-pages)) | 19 | 22 | webpack, Turbopack | App, Pages | |
 
 Next.js 10 and 11 can't load `next.config.ts` or `next.config.mjs`; use `next.config.js` with `require()` there (the `init` command does). The `<Link><a>…</a></Link>` style of those versions is fine.
 
@@ -184,17 +184,21 @@ export default withNextDevtools(nextConfig, {
 ## Development
 
 ```bash
-npm install
+npm install --include=dev
 npm run build        # dist/ (config + loader via tsup, client via tsc) — commit it, GitHub installs use it
-npm test             # loader transform + route scanner
-cd examples/app-router && npm install && npm run dev        # Turbopack
-cd examples/app-router && npm run dev:webpack               # webpack
-cd examples/pages-router && npm install && npm run dev
+npm test             # loader transform, route/component scanners, per-version config
 ```
 
-The examples install the package by copy (`install-links=true` in `.npmrc`), so rerun `npm install` in an example after rebuilding.
+Try it in an app from [`examples/`](examples) — one per Next.js major from 10 to 16:
 
-To re-record `docs/demo.gif`, start `examples/app-router` on port 3100 and run `node docs/record-demo.mjs` (needs `playwright` and `ffmpeg`).
+```bash
+cd examples/next-16 && npm install && npm run dev        # App Router, Turbopack
+cd examples/next-12 && npm install && npm run dev        # Pages Router, React 17
+```
+
+The examples install the package by copy (`install-links=true` in `.npmrc`), so rerun `npm install` in an example after rebuilding. See [examples/README.md](examples/README.md) for Node versions and notes on old Next.js releases.
+
+To re-record `docs/demo.gif`, start `examples/next-16` on port 3100 and run `node docs/record-demo.mjs` (needs `playwright` and `ffmpeg`).
 
 ## License
 
