@@ -1,4 +1,4 @@
-import { type AssetEntry, type ComponentFile, type ConfigSnapshot, type OpenResult, type PackageEntry, type ProjectInfo, type RouteEntry } from "../shared/types.js";
+import { type AssetEntry, type ComponentFile, type ConfigSnapshot, type GitInfo, type OpenResult, type PackageEntry, type ProjectInfo, type RouteEntry } from "../shared/types.js";
 export declare const PROJECT_ROOT: string | undefined;
 export declare const configured: boolean;
 /** Base URL of the local API — the network tab hides requests to it. */
@@ -15,6 +15,7 @@ export declare const api: {
     packages: (fresh?: boolean) => Promise<PackageEntry[]>;
     packagesLatest: (fresh?: boolean) => Promise<PackageEntry[]>;
     config: (fresh?: boolean) => Promise<ConfigSnapshot>;
+    git: (file: string, line?: number, lookup?: boolean) => Promise<GitInfo>;
 };
 export interface SourceLocation {
     file: string;

@@ -4,6 +4,7 @@ import { api } from "../api.js";
 import { ApiErrorBox, FileLink, useAsync, useDevtools } from "../context.js";
 import { buildTree, walkTree } from "../fiber.js";
 import { IconOpen, IconRefresh } from "../icons.js";
+import { GitCard } from "../GitCard.js";
 
 const ROLE_LABEL: Partial<Record<ComponentFile["role"], string>> = {
   page: "Page",
@@ -155,6 +156,10 @@ export function ProjectComponents({ mode }: { mode: ReactNode }) {
                   </tr>
                 </tbody>
               </table>
+              <div className="nd-section">
+                <h3 style={{ fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }}>Git</h3>
+                <GitCard file={sel.file} />
+              </div>
               <div className="nd-section">
                 <h3 style={{ fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }}>Imported by {sel.usedBy.length} {sel.usedBy.length === 1 ? "file" : "files"}</h3>
                 {sel.usedBy.length ? (

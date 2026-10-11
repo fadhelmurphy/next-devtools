@@ -17,6 +17,7 @@ import {
 } from "../fiber.js";
 import { IconChevron, IconInspect, IconOpen, IconRefresh } from "../icons.js";
 import { ProjectComponents } from "./ProjectComponents.js";
+import { GitCard } from "../GitCard.js";
 import { hideHighlight, highlight } from "../overlay.js";
 import { updateSettings } from "../settings.js";
 
@@ -279,6 +280,13 @@ function Details({ item, onSelect }: { item: Indexed; onSelect: (id: number) => 
           </button>
         )}
       </div>
+
+      {source && (
+        <div className="nd-section">
+          <h3 style={{ fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }}>Git</h3>
+          <GitCard file={source.file} line={source.line} />
+        </div>
+      )}
 
       <div className="nd-section">
         <h3 style={{ fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }}>Props</h3>

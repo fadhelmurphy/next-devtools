@@ -1,6 +1,6 @@
 {
   "name": "@fadhelmurphy/next-devtools",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Nuxt DevTools-style developer panel for Next.js 10+: component inspector with click-to-open-in-editor, component tree (incl. Server Components), routes, packages, config, payload, network, assets and Web Vitals. App Router and Pages Router, Turbopack and webpack.",
   "license": "MIT",
   "author": "Fadhel Ijlal Falah",

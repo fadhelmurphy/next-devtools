@@ -7,7 +7,7 @@ var __dirname = /* @__PURE__ */ getDirname();
 var __filename = /* @__PURE__ */ getFilename();
 
 // src/config/index.ts
-import path9 from "path";
+import path10 from "path";
 import { createRequire as createRequire5 } from "module";
 import { fileURLToPath as fileURLToPath2 } from "url";
 
@@ -15,7 +15,7 @@ import { fileURLToPath as fileURLToPath2 } from "url";
 import http from "http";
 import fs6 from "fs";
 import os2 from "os";
-import path8 from "path";
+import path9 from "path";
 import crypto from "crypto";
 
 // src/shared/types.ts
@@ -663,17 +663,190 @@ function getConfigSnapshot(root) {
   return { config, envFiles };
 }
 
+// src/config/git.ts
+import { execFile } from "child_process";
+import https2 from "https";
+import path8 from "path";
+var SEP = "";
+var CACHE_TTL = 15e3;
+var cache = /* @__PURE__ */ new Map();
+var loginCache = /* @__PURE__ */ new Map();
+var RETRY_FAILED_LOOKUP = 10 * 6e4;
+function git(cwd, args) {
+  return new Promise((resolve, reject) => {
+    execFile("git", args, { cwd, timeout: 5e3, maxBuffer: 1024 * 1024, windowsHide: true }, (err, stdout) => {
+      if (err) reject(err);
+      else resolve(String(stdout));
+    });
+  });
+}
+function parseRemote(url) {
+  const u = url.trim();
+  if (!u) return void 0;
+  let host;
+  let repoPath;
+  let m;
+  if (m = u.match(/^[\w.-]+@([^:/]+):(.+)$/)) {
+    host = m[1];
+    repoPath = m[2];
+  } else {
+    try {
+      const parsed = new URL(u);
+      host = parsed.hostname;
+      repoPath = parsed.pathname;
+    } catch {
+      return void 0;
+    }
+  }
+  repoPath = repoPath.replace(/^\/+/, "").replace(/\.git$/, "").replace(/\/+$/, "");
+  if (!host || !repoPath.includes("/")) return void 0;
+  host = host.replace(/^ssh\./, "").replace(/^www\./, "");
+  const provider = /github/.test(host) ? "github" : /gitlab/.test(host) ? "gitlab" : /bitbucket/.test(host) ? "bitbucket" : "other";
+  return { provider, host, path: repoPath, web: `https://${host}/${repoPath}` };
+}
+function githubLoginFromEmail(email) {
+  var _a;
+  return (_a = email.match(/^(?:\d+\+)?([A-Za-z0-9-]+)@users\.noreply\.github\.com$/i)) == null ? void 0 : _a[1];
+}
+function commitUrl(remote, sha) {
+  if (!remote || /^0+$/.test(sha)) return void 0;
+  if (remote.provider === "gitlab") return `${remote.web}/-/commit/${sha}`;
+  if (remote.provider === "bitbucket") return `${remote.web}/commits/${sha}`;
+  return `${remote.web}/commit/${sha}`;
+}
+function authorUrl(remote, commit, branch) {
+  const login = commit.login ?? ((remote == null ? void 0 : remote.provider) === "github" ? githubLoginFromEmail(commit.authorEmail) : void 0);
+  if (login && (remote == null ? void 0 : remote.provider) === "github") return `https://${remote.host}/${login}`;
+  if (!remote) return void 0;
+  if (remote.provider === "github") return `${remote.web}/commits?author=${encodeURIComponent(commit.authorEmail)}`;
+  if (remote.provider === "gitlab") return `${remote.web}/-/commits/${encodeURIComponent(branch || "HEAD")}?author=${encodeURIComponent(commit.authorName)}`;
+  return void 0;
+}
+function parseBlame(out) {
+  var _a;
+  const lines = out.split("\n");
+  const sha = (_a = lines[0]) == null ? void 0 : _a.split(" ")[0];
+  if (!sha || !/^[0-9a-f]{7,40}$/.test(sha)) return void 0;
+  const get = (k) => {
+    var _a2;
+    return ((_a2 = lines.find((l) => l.startsWith(k + " "))) == null ? void 0 : _a2.slice(k.length + 1)) ?? "";
+  };
+  const time = Number(get("author-time"));
+  return {
+    sha,
+    authorName: get("author"),
+    authorEmail: get("author-mail").replace(/^<|>$/g, ""),
+    date: time ? new Date(time * 1e3).toISOString() : "",
+    subject: get("summary")
+  };
+}
+function githubAuthor(remote, sha) {
+  if (remote.provider !== "github" || remote.host !== "github.com") return Promise.resolve(null);
+  const key = `${remote.path}@${sha}`;
+  let hit = loginCache.get(key);
+  if (!hit) {
+    const headers = { "user-agent": "next-devtools", accept: "application/vnd.github+json" };
+    const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+    if (token) headers.authorization = `Bearer ${token}`;
+    const url = `https://api.github.com/repos/${remote.path}/commits/${sha}`;
+    const pick = (j) => {
+      var _a;
+      return ((_a = j == null ? void 0 : j.author) == null ? void 0 : _a.login) ? { login: j.author.login, avatar: j.author.avatar_url } : null;
+    };
+    hit = typeof fetch === "function" && typeof AbortController === "function" ? (() => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 4e3);
+      return fetch(url, { headers, signal: ctrl.signal }).then((r) => r.ok ? r.json() : null).then(pick, () => null).finally(() => clearTimeout(t));
+    })() : new Promise((resolve) => {
+      const req2 = https2.get(url, { headers, timeout: 4e3 }, (res) => {
+        let body = "";
+        res.setEncoding("utf8");
+        res.on("data", (c) => body += c);
+        res.on("end", () => {
+          try {
+            resolve(res.statusCode === 200 ? pick(JSON.parse(body)) : null);
+          } catch {
+            resolve(null);
+          }
+        });
+      });
+      req2.on("timeout", () => req2.destroy());
+      req2.on("error", () => resolve(null));
+    });
+    loginCache.set(key, hit);
+    hit.then((r) => {
+      var _a, _b;
+      if (!r) (_b = (_a = setTimeout(() => loginCache.delete(key), RETRY_FAILED_LOOKUP)).unref) == null ? void 0 : _b.call(_a);
+    });
+  }
+  return hit;
+}
+async function enrich(c, remote, branch, lookup) {
+  const uncommitted = /^0+$/.test(c.sha);
+  let login = (remote == null ? void 0 : remote.provider) === "github" ? githubLoginFromEmail(c.authorEmail) : void 0;
+  let avatar;
+  if (!uncommitted && remote && lookup) {
+    const gh = await githubAuthor(remote, c.sha);
+    if (gh == null ? void 0 : gh.login) {
+      login = gh.login;
+      avatar = gh.avatar;
+    }
+  }
+  if (login && !avatar && (remote == null ? void 0 : remote.host) === "github.com") avatar = `https://github.com/${login}.png?size=64`;
+  const commit = { ...c, shortSha: c.sha.slice(0, 7), login, avatar, uncommitted };
+  commit.url = commitUrl(remote, c.sha);
+  commit.authorUrl = uncommitted ? void 0 : authorUrl(remote, commit, branch);
+  return commit;
+}
+async function load(root, abs, line, lookup) {
+  const dir = path8.dirname(abs);
+  let top;
+  try {
+    top = (await git(dir, ["rev-parse", "--show-toplevel"])).trim();
+  } catch (e) {
+    const missing = e.code === "ENOENT";
+    return { available: false, reason: missing ? "git isn't installed or not on PATH" : "Not inside a git repository" };
+  }
+  const [remoteUrl, branch, status, log, blame] = await Promise.all([
+    git(top, ["remote", "get-url", "origin"]).catch(() => ""),
+    git(top, ["rev-parse", "--abbrev-ref", "HEAD"]).then((s) => s.trim()).catch(() => void 0),
+    git(top, ["status", "--porcelain", "--", abs]).catch(() => ""),
+    git(top, ["log", "-1", `--format=%H${SEP}%an${SEP}%ae${SEP}%aI${SEP}%s`, "--", abs]).catch(() => ""),
+    line ? git(top, ["blame", "-L", `${line},${line}`, "--porcelain", "--", abs]).catch(() => "") : Promise.resolve("")
+  ]);
+  const remote = parseRemote(remoteUrl);
+  const st = status.trim().slice(0, 2);
+  const state = !st ? "clean" : st === "??" ? "untracked" : "modified";
+  let file;
+  const parts = log.trim().split(SEP);
+  if (parts.length === 5 && parts[0]) {
+    file = await enrich({ sha: parts[0], authorName: parts[1], authorEmail: parts[2], date: parts[3], subject: parts[4] }, remote, branch, lookup);
+  }
+  let lineCommit;
+  const b = blame ? parseBlame(blame) : void 0;
+  if (b) lineCommit = await enrich(b, remote, branch, lookup);
+  return { available: true, branch, remote, state, file, line: lineCommit, lineNumber: line, path: path8.relative(top, abs).split(path8.sep).join("/") };
+}
+function getGitInfo(root, abs, line, lookup = true) {
+  const key = `${abs}:${line ?? ""}:${lookup ? 1 : 0}`;
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_TTL) return hit.value;
+  const value = load(root, abs, line, lookup).catch((e) => ({ available: false, reason: String((e == null ? void 0 : e.message) || e) }));
+  cache.set(key, { at: Date.now(), value });
+  return value;
+}
+
 // src/config/server.ts
 var GLOBAL_KEY = /* @__PURE__ */ Symbol.for("next-devtools.server");
 function getOrCreateToken(root) {
   const dirs = [
-    path8.join(root, "node_modules", ".cache", "next-devtools"),
-    path8.join(os2.tmpdir(), "next-devtools-" + crypto.createHash("sha1").update(root).digest("hex").slice(0, 12))
+    path9.join(root, "node_modules", ".cache", "next-devtools"),
+    path9.join(os2.tmpdir(), "next-devtools-" + crypto.createHash("sha1").update(root).digest("hex").slice(0, 12))
   ];
   for (const dir of dirs) {
     try {
       fs6.mkdirSync(dir, { recursive: true });
-      const file = path8.join(dir, "token");
+      const file = path9.join(dir, "token");
       try {
         const existing = fs6.readFileSync(file, "utf8").trim();
         if (existing) return existing;
@@ -716,9 +889,9 @@ function readBody(req2) {
 }
 function resolveInsideRoot(root, file) {
   if (typeof file !== "string" || !file) return null;
-  const abs = path8.resolve(root, file);
-  const rel = path8.relative(root, abs);
-  if (rel.startsWith("..") || path8.isAbsolute(rel)) return null;
+  const abs = path9.resolve(root, file);
+  const rel = path9.relative(root, abs);
+  if (rel.startsWith("..") || path9.isAbsolute(rel)) return null;
   return abs;
 }
 function startDevtoolsServer(opts) {
@@ -739,7 +912,7 @@ function startDevtoolsServer(opts) {
       return res.end();
     }
     const url = new URL(req2.url || "/", "http://localhost");
-    if (url.pathname === "/ping") return send(res, 200, { ok: true, root: path8.basename(opts.root) });
+    if (url.pathname === "/ping") return send(res, 200, { ok: true, root: path9.basename(opts.root) });
     if (req2.headers[TOKEN_HEADER] !== opts.token) return send(res, 401, { error: "invalid token" });
     try {
       switch (url.pathname) {
@@ -764,6 +937,12 @@ function startDevtoolsServer(opts) {
         }
         case "/packages":
           return send(res, 200, await listPackages(opts.root, url.searchParams.get("latest") === "1"));
+        case "/git": {
+          const abs = resolveInsideRoot(opts.root, url.searchParams.get("file") || "");
+          if (!abs || !fs6.existsSync(abs)) return send(res, 404, { error: "file not found in project" });
+          const line = Number(url.searchParams.get("line")) || void 0;
+          return send(res, 200, await getGitInfo(opts.root, abs, line, url.searchParams.get("lookup") !== "0"));
+        }
         case "/config":
           return send(res, 200, getConfigSnapshot(opts.root));
         default:
@@ -788,11 +967,11 @@ function startDevtoolsServer(opts) {
 // src/config/index.ts
 var PHASE_DEVELOPMENT_SERVER = "phase-development-server";
 var DEFAULT_PORT = 4590;
-var here = typeof __dirname !== "undefined" ? __dirname : path9.dirname(fileURLToPath2(import.meta.url));
-var LOADER_PATH = path9.join(here, "loader.cjs");
+var here = typeof __dirname !== "undefined" ? __dirname : path10.dirname(fileURLToPath2(import.meta.url));
+var LOADER_PATH = path10.join(here, "loader.cjs");
 function majorMinorOf(root, pkg, fallback) {
   try {
-    const v = createRequire5(path9.join(root, "package.json"))(`${pkg}/package.json`).version;
+    const v = createRequire5(path10.join(root, "package.json"))(`${pkg}/package.json`).version;
     const [maj, min] = v.split(".").map(Number);
     return [maj || 0, min || 0];
   } catch {
@@ -800,7 +979,7 @@ function majorMinorOf(root, pkg, fallback) {
   }
 }
 var ROOT_MODERN = /[\\/]dist[\\/]client[\\/]root\.js$/;
-var ROOT_LEGACY = path9.join(here, "client", "root-legacy.js");
+var ROOT_LEGACY = path10.join(here, "client", "root-legacy.js");
 var LegacyReactRootPlugin = class {
   apply(compiler) {
     compiler.hooks.normalModuleFactory.tap("NextDevtoolsLegacyRoot", (nmf) => {
@@ -871,7 +1050,7 @@ function withNextDevtools(nextConfig = {}, options = {}) {
     }
     rememberConfig(resolved);
     const config = { ...resolved };
-    const root = path9.resolve(options.root ?? process.cwd());
+    const root = path10.resolve(options.root ?? process.cwd());
     const port = Number(options.port ?? process.env.NEXT_DEVTOOLS_PORT ?? DEFAULT_PORT);
     const token = getOrCreateToken(root);
     const pageExtensions = config.pageExtensions ?? ["tsx", "ts", "jsx", "js"];

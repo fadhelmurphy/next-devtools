@@ -15,7 +15,8 @@ Works on **Next.js 10 through 16**, with the **App Router and Pages Router**, **
 | | |
 |---|---|
 | **Overview** | Project at a glance: Next/React/Node versions, bundler, counts for pages, components, API routes, packages and assets (each opens its tab), an update badge when a newer Next.js is out, and the layouts + page that render the current URL. |
-| **Inspector** | Hover anything on the page: component name, Server/Client, file and line, size. Click opens the file in your editor at that line. Shift + click keeps inspecting. |
+| **Inspector** | Hover anything on the page: component name, Server/Client, file and line, who last changed that line and when, size. Click opens the file in your editor at that line. Shift + click keeps inspecting. |
+| **Git** | For every inspected component: the commit that last changed its line (`git blame`) and the last commit to its file, with author, date, message, uncommitted-changes badge, and links to the commit, the file's history and the author's profile on GitHub (or their commits on GitLab). |
 | **Components** | *On this page*: the live tree including **Server Components** (React 19), with props, `useState` values and an Open in editor button (or double-click a row). *All in project*: every component file, whether it renders on the server or client, its role (page, layout, loading…), which files import it, and which ones are on the current page. |
 | **Routes** | Every page and API route from `app/` and `pages/`: route groups, dynamic, catch-all, parallel and intercepting routes. Fill in params and visit; the current route is highlighted. |
 | **Assets** | Everything in `public/` with previews, sizes, copy-URL. |
@@ -164,6 +165,10 @@ export default withNextDevtools(nextConfig, {
 - **Project data.** `withNextDevtools` starts a tiny HTTP server on `127.0.0.1` (default port 4590) during `next dev` for routes, assets, project info and open-in-editor (via [`launch-editor`](https://github.com/yyx990803/launch-editor)). Requests need a per-project token that's only inlined into your dev bundle, and file paths are restricted to the project root, so other websites can't drive it.
 - **Isolation.** The panel renders in its own React root inside a shadow DOM: your CSS doesn't affect it, it doesn't affect your CSS, and it never appears in your component tree.
 - **Production.** The config wrapper is a no-op outside the `phase-development-server` phase, and the panel is behind `process.env.NODE_ENV === "development"`, so `next build` output contains neither attributes nor panel code.
+
+## Git info
+
+Read with your local `git` — nothing to configure. To link an author to their GitHub profile and show their avatar, DevTools asks the GitHub API which account made the commit (public repos, cached per commit; set `GITHUB_TOKEN` for private repos or to avoid the 60 requests/hour anonymous limit). When that isn't possible — offline, not pushed yet, GitLab or another host — the author links to their commits in the repository instead, and to their profile directly if the commit email is a GitHub `…@users.noreply.github.com` address. Hover tooltips only use local git.
 
 ## Troubleshooting
 

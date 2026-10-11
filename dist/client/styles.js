@@ -416,6 +416,23 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 2px 6px; border: 1px s
 .nd-ov-cols .nd-section { margin-top: 0; margin-bottom: 18px; }
 .nd-ov-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; padding: 14px 0 4px; border-top: 1px solid var(--line-soft); margin-top: 6px; }
 
+/* ---------- git ---------- */
+.nd-git { display: flex; flex-direction: column; gap: 12px; }
+.nd-commit-label { font-size: 11.5px; color: var(--faint); margin-bottom: 5px; }
+.nd-commit-body { display: flex; gap: 10px; align-items: flex-start; }
+.nd-avatar { width: 28px; height: 28px; border-radius: 50%; flex: none; background: var(--raise); object-fit: cover; }
+.nd-avatar-initials { display: inline-grid; place-items: center; font-size: 11px; font-weight: 650; color: var(--accent-strong); background: var(--accent-wash); }
+.nd-commit-text { min-width: 0; flex: 1; }
+.nd-commit-who { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-weight: 550; }
+.nd-commit-who time { font-weight: 400; font-size: 12px; }
+.nd-commit-msg { display: flex; gap: 8px; align-items: baseline; margin-top: 2px; color: var(--muted); }
+.nd-commit-msg span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.nd-root .nd-commit-sha { font-family: var(--mono); font-size: 11.5px; color: var(--accent-strong); text-decoration: none; flex: none; }
+.nd-root a.nd-commit-sha:hover { text-decoration: underline; }
+.nd-git-foot { font-size: 12px; }
+.nd-tip-git { margin-top: 4px; font-size: 11.5px; color: var(--muted); }
+.nd-tip-git b { color: var(--text); font-weight: 600; }
+
 /* ---------- narrow screens ---------- */
 @media (max-width: 720px) {
   .nd-panel { left: 0; right: 0; bottom: 0; border-radius: 12px 12px 0 0; grid-template-columns: 1fr; grid-template-rows: auto 1fr; }

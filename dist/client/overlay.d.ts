@@ -6,6 +6,12 @@ export interface HighlightLabel {
     tag?: string;
     source?: SourceLocation | null;
     hint?: string;
+    /** "Last changed by …" line, filled in after the git lookup */
+    git?: {
+        author: string;
+        when: string;
+        uncommitted?: boolean;
+    };
 }
 export declare function highlight(elements: Element[], label?: HighlightLabel): void;
 export declare function hideHighlight(): void;

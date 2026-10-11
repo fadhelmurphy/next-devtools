@@ -98,3 +98,47 @@ export interface OpenResult {
   wsl?: string;
   windowsPath?: string;
 }
+
+export interface GitRemote {
+  provider: "github" | "gitlab" | "bitbucket" | "other";
+  host: string;
+  /** owner/repo (or group/subgroup/repo) */
+  path: string;
+  /** https URL of the repository page */
+  web: string;
+}
+
+export interface GitCommit {
+  sha: string;
+  shortSha: string;
+  authorName: string;
+  authorEmail: string;
+  /** ISO date */
+  date: string;
+  subject: string;
+  /** Account on the remote, when known (GitHub API or noreply email) */
+  login?: string;
+  avatar?: string;
+  /** Commit page on the remote */
+  url?: string;
+  /** Author's profile, or their commits in this repo */
+  authorUrl?: string;
+  /** Blame of a line that isn't committed yet */
+  uncommitted?: boolean;
+}
+
+export interface GitInfo {
+  available: boolean;
+  reason?: string;
+  branch?: string;
+  remote?: GitRemote;
+  /** Working-tree state of the file */
+  state?: "clean" | "modified" | "untracked";
+  /** Last commit that touched the file */
+  file?: GitCommit;
+  /** Last commit that changed `lineNumber` */
+  line?: GitCommit;
+  lineNumber?: number;
+  /** File path relative to the repository root */
+  path?: string;
+}

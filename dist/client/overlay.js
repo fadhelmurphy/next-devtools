@@ -1,5 +1,6 @@
 import { SOURCE_ATTR } from "../shared/types.js";
-import { parseSource } from "./api.js";
+import { api, parseSource } from "./api.js";
+import { timeAgo } from "./GitCard.js";
 import { HOST_ID, ownerOfElement } from "./fiber.js";
 /* Highlight box + tooltip drawn inside our shadow root. Plain DOM on purpose:
    pointermove fires constantly and must not re-render React. */
@@ -55,6 +56,7 @@ export function highlight(elements, label) {
       ${label.tag ? `<span class="nd-tip-tag">&lt;${esc(label.tag)}&gt;</span>` : ""}
     </div>
     ${label.source ? `<div class="nd-tip-src">${esc(label.source.file)}:${label.source.line}</div>` : ""}
+    ${label.git ? `<div class="nd-tip-git">${label.git.uncommitted ? "Line not committed yet" : `Last changed by <b>${esc(label.git.author)}</b> ${esc(label.git.when)}`}</div>` : ""}
     <div class="nd-tip-foot"><span>${Math.round(rect.width)} × ${Math.round(rect.height)}</span>${label.hint ? `<span>${esc(label.hint)}</span>` : ""}</div>`;
     tip.style.display = "block";
     // Below the box if there's room, otherwise above; clamp horizontally.
@@ -101,8 +103,28 @@ const onMove = (e) => {
         return;
     last = el;
     const d = describe(el);
-    highlight([el], Object.assign(Object.assign({}, d), { hint: active.mode === "editor" ? (d.source ? "Click to open in editor" : "No source for this element") : "Click to select" }));
+    const label = Object.assign(Object.assign({}, d), { hint: active.mode === "editor" ? (d.source ? "Click to open in editor" : "No source for this element") : "Click to select" });
+    highlight([el], label);
+    if (gitTimer)
+        clearTimeout(gitTimer);
+    if (!d.source)
+        return;
+    const src = d.source;
+    // Wait for the pointer to settle, then blame the element's line (local git only, no network).
+    gitTimer = setTimeout(() => {
+        api
+            .git(src.file, src.line, false)
+            .then((info) => {
+            var _a;
+            const c = (_a = info.line) !== null && _a !== void 0 ? _a : info.file;
+            if (!active || last !== el || !info.available || !c)
+                return;
+            highlight([el], Object.assign(Object.assign({}, label), { git: { author: c.authorName, when: timeAgo(c.date), uncommitted: c.uncommitted } }));
+        })
+            .catch(() => { });
+    }, 120);
 };
+let gitTimer = null;
 const swallow = (e) => {
     if (!active || isOurs(e))
         return;

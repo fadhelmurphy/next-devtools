@@ -10,6 +10,7 @@ import { openInEditor } from "./editor";
 import { scanComponents } from "./components";
 import { listPackages } from "./packages";
 import { getConfigSnapshot } from "./runtime-config";
+import { getGitInfo } from "./git";
 
 export interface ServerOptions {
   root: string;
@@ -136,6 +137,13 @@ export function startDevtoolsServer(opts: ServerOptions): void {
         }
         case "/packages":
           return send(res, 200, await listPackages(opts.root, url.searchParams.get("latest") === "1"));
+        case "/git": {
+          const abs = resolveInsideRoot(opts.root, url.searchParams.get("file") || "");
+          if (!abs || !fs.existsSync(abs)) return send(res, 404, { error: "file not found in project" });
+          const line = Number(url.searchParams.get("line")) || undefined;
+          // lookup=0: skip the GitHub API (used for hover tooltips)
+          return send(res, 200, await getGitInfo(opts.root, abs, line, url.searchParams.get("lookup") !== "0"));
+        }
         case "/config":
           return send(res, 200, getConfigSnapshot(opts.root));
         default:
