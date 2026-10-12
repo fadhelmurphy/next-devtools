@@ -35,20 +35,19 @@ const go = async (loc, steps) => { const c = await center(loc); await moveTo(c.x
 await moveTo(700, 420, 1);
 await wait(900);
 
-// 1. Inspector: hover around, then click to open in editor
+// 1. Inspector: hover shows source, render time and the last commit; click opens the editor
 await go(host.locator(".nd-dock button[aria-label='Inspect an element']"), 22);
 await wait(300);
 await page.mouse.click(pos.x, pos.y);
 await wait(400);
-await go(page.locator("main h1"), 24); await wait(900);
-await go(page.locator(".card p").first(), 16); await wait(800);
-await go(page.locator("article.card h2").first(), 16); await wait(900);
-await go(page.locator("article.card p").nth(1), 14); await wait(700);
-const h2 = await go(page.locator("article.card h2").nth(1), 14); await wait(700);
+await go(page.locator("main h1"), 24); await wait(1200);
+await go(page.locator("article.card h2").first(), 16); await wait(1300);
+await go(page.getByRole("button", { name: "Increment" }), 16); await wait(1600);
+const h2 = await go(page.locator("article.card h2").nth(1), 14); await wait(900);
 await page.mouse.click(h2.x, h2.y);
-await wait(1600);
+await wait(1400);
 
-// 2. Open the panel → Components
+// 2. Open the panel → Components → Counter: render time + git history
 await go(host.locator(".nd-mark-btn"), 22);
 await wait(250);
 await page.mouse.click(pos.x, pos.y);
@@ -56,22 +55,40 @@ await wait(900);
 await go(host.locator(".nd-tab", { hasText: "Components" }), 20);
 await page.mouse.click(pos.x, pos.y);
 await wait(900);
-for (const name of ["Home", "ProductCard"]) {
-  await go(host.locator(".nd-tree-row", { hasText: name }).first(), 12);
-  await wait(500);
-}
+await go(host.locator(".nd-tree-row", { hasText: "ProductCard" }).first(), 12);
+await wait(400);
 await go(host.locator(".nd-tree-row", { hasText: "Counter" }).first(), 10);
 await page.mouse.click(pos.x, pos.y);
-await wait(1000);
-// interact with the app, watch state update live
+await wait(1400);
+// interact with the app, watch state + render count update live
 await go(page.getByRole("button", { name: "Increment" }), 22);
 for (let i = 0; i < 3; i++) { await page.mouse.click(pos.x, pos.y); await wait(550); }
-await wait(900);
+await wait(700);
+// scroll the details to the Git card
+const detail = host.locator(".nd-detail");
+await go(detail, 16);
+for (let i = 0; i < 3; i++) { await page.mouse.wheel(0, 80); await wait(120); }
+await wait(2200);
 
-// 3. Routes → visit dynamic route with a param
-await go(host.locator(".nd-tab", { hasText: "Routes" }), 22);
+// 3. Renders tab: highlight renders on the page, then jump back to the component
+await go(host.locator(".nd-tab", { hasText: "Renders" }), 22);
 await page.mouse.click(pos.x, pos.y);
 await wait(1000);
+await go(host.locator("label", { hasText: "Highlight renders" }), 18);
+await page.mouse.click(pos.x, pos.y);
+await wait(500);
+await go(page.getByRole("button", { name: "Increment" }), 22);
+for (let i = 0; i < 3; i++) { await page.mouse.click(pos.x, pos.y); await wait(650); }
+await wait(800);
+await go(host.locator(".nd-renders tbody tr", { hasText: "Counter" }).first(), 22);
+await wait(400);
+await page.mouse.click(pos.x, pos.y);
+await wait(1600);
+
+// 4. Routes → visit a dynamic route, then Overview for the new URL
+await go(host.locator(".nd-tab", { hasText: "Routes" }), 22);
+await page.mouse.click(pos.x, pos.y);
+await wait(900);
 await go(host.locator("button[aria-label='Visit /blog/[slug]']"), 22);
 await page.mouse.click(pos.x, pos.y);
 await wait(400);
@@ -79,17 +96,10 @@ await page.keyboard.type("hello-next", { delay: 70 });
 await wait(300);
 await go(host.locator("form button", { hasText: "Visit" }), 14);
 await page.mouse.click(pos.x, pos.y);
-await wait(1700);
-
-// 4. Overview for the new URL, then Performance
+await wait(1500);
 await go(host.locator(".nd-tab", { hasText: "Overview" }), 22);
 await page.mouse.click(pos.x, pos.y);
-await wait(1800);
-await go(host.locator(".nd-tab", { hasText: "Performance" }), 16);
-await page.mouse.click(pos.x, pos.y);
-await wait(2600);
-console.log("CLS shown:", await host.locator(".nd-vital", { hasText: "CLS" }).innerText().catch(() => "n/a"));
-await wait(600);
+await wait(2200);
 
 await context.close();
 await browser.close();

@@ -4,9 +4,9 @@ A [Nuxt DevTools](https://devtools.nuxt.com)-style panel for **Next.js**. Hover 
 
 Works on **Next.js 10 through 16**, with the **App Router and Pages Router**, **Turbopack and webpack** (4 and 5). Development only: production builds contain none of it.
 
-![Next DevTools demo: inspecting elements, browsing the component tree, visiting a dynamic route and checking Web Vitals](docs/demo.gif)
+![Next DevTools demo: inspecting elements, component render times and git history, the Renders tab, visiting a dynamic route](docs/demo.gif)
 
-<sub>The demo runs <a href="examples/next-16">examples/next-16</a> on Next.js 16 with Turbopack: inspect elements and open their source, browse the tree with Server Components and live state, visit a dynamic route, check the layouts for the current URL, read Web Vitals.</sub>
+<sub>The demo runs <a href="examples/next-16">examples/next-16</a> on Next.js 16 with Turbopack: hover elements to see their source, render time and last commit, open them in the editor, inspect a component's render times and git history, watch renders live in the Renders tab, visit a dynamic route and check its layouts.</sub>
 
 > Successor of [react-inspector-devtools](https://github.com/fadhelmurphy/react-inspector-devtools). That project needed the React DevTools extension and `_debugSource`, which React 19 removed. This one tags JSX at compile time, so it works on React 18 and 19, in Server Components, with no browser extension.
 
