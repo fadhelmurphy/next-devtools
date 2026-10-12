@@ -416,6 +416,30 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 2px 6px; border: 1px s
 .nd-ov-cols .nd-section { margin-top: 0; margin-bottom: 18px; }
 .nd-ov-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; padding: 14px 0 4px; border-top: 1px solid var(--line-soft); margin-top: 6px; }
 
+/* ---------- renders ---------- */
+.nd-flash { position: fixed; left: 0; top: 0; border: 2px solid var(--client); border-radius: 3px; animation: nd-flash ease-out forwards; }
+@keyframes nd-flash { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .nd-flash { animation: none; opacity: .6; } }
+.nd-sev-good { color: var(--good); }
+.nd-sev-warn { color: var(--warn); }
+.nd-sev-bad { color: var(--bad); }
+.nd-ms { font-family: var(--mono); font-size: 11px; margin-left: auto; padding-left: 8px; color: var(--faint); flex: none; }
+.nd-ms[data-sev="warn"] { color: var(--warn); }
+.nd-ms[data-sev="bad"] { color: var(--bad); }
+.nd-tree-row .nd-ms + .nd-row-action { margin-left: 4px; }
+.nd-spark { display: flex; align-items: flex-end; gap: 2px; height: 28px; margin-top: 8px; }
+.nd-spark span { width: 6px; min-height: 2px; border-radius: 1px; background: var(--client); opacity: .8; }
+.nd-spark span[data-sev="warn"] { background: var(--warn); }
+.nd-spark span[data-sev="bad"] { background: var(--bad); }
+.nd-commits { display: flex; align-items: flex-end; gap: 2px; height: 56px; padding: 6px 0; border-bottom: 1px solid var(--line-soft); margin-bottom: 10px; overflow: hidden; }
+.nd-commits span { flex: 1 0 4px; max-width: 10px; min-height: 2px; border-radius: 1px 1px 0 0; background: var(--accent); opacity: .85; }
+.nd-commits span[data-sev="warn"] { background: var(--warn); }
+.nd-commits span[data-sev="bad"] { background: var(--bad); }
+.nd-renders td.nd-num { text-align: right; font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+.nd-renders th.nd-num { text-align: right; }
+.nd-renders tr { cursor: pointer; }
+.nd-renders tr:hover td { background: var(--raise); }
+
 /* ---------- git ---------- */
 .nd-git { display: flex; flex-direction: column; gap: 12px; }
 .nd-commit-label { font-size: 11.5px; color: var(--faint); margin-bottom: 5px; }
@@ -430,6 +454,7 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 2px 6px; border: 1px s
 .nd-root .nd-commit-sha { font-family: var(--mono); font-size: 11.5px; color: var(--accent-strong); text-decoration: none; flex: none; }
 .nd-root a.nd-commit-sha:hover { text-decoration: underline; }
 .nd-git-foot { font-size: 12px; }
+.nd-git-authors { font-size: 12px; margin-top: -4px; }
 .nd-tip-git { margin-top: 4px; font-size: 11.5px; color: var(--muted); }
 .nd-tip-git b { color: var(--text); font-weight: 600; }
 

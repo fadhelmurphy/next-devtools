@@ -12,6 +12,10 @@ export interface DevtoolsContext {
   setTab: (tab: string) => void;
   startPick: () => void;
   picking: boolean;
+  /** Jump to the Components tab and select a component by fiber id. */
+  selectComponent: (id: number) => void;
+  pendingSelect: number | null;
+  clearSelect: () => void;
 }
 
 export const Ctx = createContext<DevtoolsContext>(null as any);

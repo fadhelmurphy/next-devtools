@@ -22,3 +22,4 @@ export const IconPayload = () => (_jsxs(Svg, { children: [_jsx("ellipse", { cx: 
 export const IconNetwork = () => (_jsx(Svg, { children: _jsx("path", { d: "M7 4v14M3.5 14.5 7 18l3.5-3.5M17 20V6M13.5 9.5 17 6l3.5 3.5" }) }));
 export const IconMoon = () => (_jsx(Svg, { children: _jsx("path", { d: "M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z" }) }));
 export const IconSun = () => (_jsxs(Svg, { children: [_jsx("circle", { cx: "12", cy: "12", r: "4" }), _jsx("path", { d: "M12 2.5v2M12 19.5v2M21.5 12h-2M4.5 12h-2M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4M18.7 18.7l-1.4-1.4M6.7 6.7 5.3 5.3" })] }));
+export const IconRenders = () => (_jsx(Svg, { children: _jsx("path", { d: "M13 3.5 5.5 13.5H12l-1 7 7.5-10H12z" }) }));

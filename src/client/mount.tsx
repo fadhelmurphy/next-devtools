@@ -1,7 +1,8 @@
 import { App } from "./App.js";
 import { renderRoot } from "./root.js";
 import { HOST_ID } from "./fiber.js";
-import { attachOverlay } from "./overlay.js";
+import { attachOverlay, flashElements } from "./overlay.js";
+import { startProfiler } from "./profiler.js";
 import { styles } from "./styles.js";
 import { startVitals } from "./vitals.js";
 import { installNetworkRecorder } from "./network.js";
@@ -31,6 +32,7 @@ export function mount(): () => void {
     attachOverlay(overlayContainer);
     document.body.appendChild(host);
     unmountRoot = renderRoot(<App />, app);
+    startProfiler(flashElements);
   }
   return () => {
     unmountRoot?.();

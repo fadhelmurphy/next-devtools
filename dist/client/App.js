@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { openInEditor } from "./api.js";
 import { Ctx, useSettings } from "./context.js";
 import { HOST_ID } from "./fiber.js";
-import { IconAssets, IconClose, IconComponents, IconConfig, IconInspect, IconMoon, IconNetwork, IconOverview, IconPackages, IconPayload, IconPerformance, IconRoutes, IconSettings, IconSun, Mark, } from "./icons.js";
+import { IconAssets, IconClose, IconComponents, IconConfig, IconInspect, IconMoon, IconNetwork, IconOverview, IconPackages, IconPayload, IconPerformance, IconRenders, IconRoutes, IconSettings, IconSun, Mark, } from "./icons.js";
 import { startInspector, stopInspector } from "./overlay.js";
 import { updateSettings } from "./settings.js";
 import { Assets } from "./tabs/Assets.js";
@@ -11,6 +11,7 @@ import { Config } from "./tabs/Config.js";
 import { Network } from "./tabs/Network.js";
 import { Packages } from "./tabs/Packages.js";
 import { Payload } from "./tabs/Payload.js";
+import { Renders } from "./tabs/Renders.js";
 import { Components } from "./tabs/Components.js";
 import { Overview } from "./tabs/Overview.js";
 import { Performance } from "./tabs/Performance.js";
@@ -25,6 +26,7 @@ const TABS = [
     { id: "packages", label: "Packages", icon: IconPackages, render: () => _jsx(Packages, {}) },
     { id: "config", label: "Config", icon: IconConfig, render: () => _jsx(Config, {}) },
     { id: "payload", label: "Payload", icon: IconPayload, render: () => _jsx(Payload, {}) },
+    { id: "renders", label: "Renders", icon: IconRenders, render: () => _jsx(Renders, {}) },
     { id: "network", label: "Network", icon: IconNetwork, render: () => _jsx(Network, {}), flush: true },
     { id: "performance", label: "Performance", icon: IconPerformance, render: () => _jsx(Performance, {}) },
 ];
@@ -59,6 +61,7 @@ export function App() {
     const [picking, setPicking] = useState(null);
     const [toastMsg, setToast] = useState(null);
     const [pendingReveal, setPendingReveal] = useState(null);
+    const [pendingSelect, setPendingSelect] = useState(null);
     const toastTimer = useRef(undefined);
     const open = settings.open;
     const tab = (_a = ALL_TABS.find((t) => t.id === settings.tab)) !== null && _a !== void 0 ? _a : TABS[0];
@@ -142,6 +145,12 @@ export function App() {
         setTab,
         startPick: () => pick("select"),
         picking: picking === "select",
+        selectComponent: (id) => {
+            setPendingSelect(id);
+            setTab("components");
+        },
+        pendingSelect,
+        clearSelect: useCallback(() => setPendingSelect(null), []),
     };
     const theme = settings.theme === "system" ? (prefersLight ? "light" : "dark") : settings.theme;
     const showPanel = open && !picking;

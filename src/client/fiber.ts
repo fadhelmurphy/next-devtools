@@ -124,7 +124,7 @@ function debugInfoOf(f: Fiber): ServerInfo[] {
 }
 
 /** Next's own error overlay is portaled into <nextjs-portal>; never part of "your" tree. */
-function isNextOverlay(f: Fiber): boolean {
+export function isNextOverlay(f: Fiber): boolean {
   for (let c = f, i = 0; c && i < 4; c = c.child, i++) {
     if (c.tag === 4 /* HostPortal */) {
       const container: any = c.stateNode?.containerInfo;
@@ -307,7 +307,53 @@ export function stateOf(node: TreeNode): unknown[] {
 }
 
 // ---- commit subscription ----------------------------------------------------
-/** Calls `fn` (throttled) after React commits; falls back to polling without the DevTools hook. */
+type CommitListener = (root: any) => void;
+const commitListeners = new Set<CommitListener>();
+let busInstalled = false;
+
+/**
+ * One wrapper around the DevTools hook's onCommitFiberRoot, shared by every
+ * feature. (React Refresh installs the hook in `next dev`, so it's there even
+ * without the React DevTools extension.) Returns false when there's no hook.
+ */
+function installCommitBus(): boolean {
+  if (busInstalled) return true;
+  const hook = typeof window !== "undefined" ? (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__ : null;
+  if (!hook || typeof hook.onCommitFiberRoot !== "function") return false;
+  busInstalled = true;
+  const original = hook.onCommitFiberRoot;
+  hook.onCommitFiberRoot = function (rendererID: unknown, root: any, ...rest: unknown[]) {
+    commitListeners.forEach((l) => {
+      try {
+        l(root);
+      } catch {
+        // never let DevTools break the app's commit
+      }
+    });
+    return original.call(this, rendererID, root, ...rest);
+  };
+  return true;
+}
+
+export function subscribeCommits(fn: CommitListener): () => void {
+  installCommitBus();
+  commitListeners.add(fn);
+  return () => void commitListeners.delete(fn);
+}
+
+export const hasCommitHook = () => installCommitBus();
+
+/** Is this fiber root one of ours (the DevTools panel) or Next's dev overlay? */
+export function isForeignRoot(root: any): boolean {
+  const container = root?.containerInfo;
+  if (!container || typeof container.getRootNode !== "function") return false;
+  const host = (container.getRootNode() as ShadowRoot).host as Element | undefined;
+  if (host?.id === HOST_ID) return true;
+  const el = container instanceof Element ? container : null;
+  return !!el?.closest?.("nextjs-portal") || el?.tagName === "NEXTJS-PORTAL" || host?.tagName === "NEXTJS-PORTAL";
+}
+
+/** Calls `fn` (throttled) after the app commits; falls back to polling without the DevTools hook. */
 export function onCommit(fn: () => void, interval = 1500): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null;
   const schedule = () => {
@@ -317,22 +363,13 @@ export function onCommit(fn: () => void, interval = 1500): () => void {
       fn();
     }, 250);
   };
-  const hook = (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__;
-  let restore: (() => void) | null = null;
-  if (hook && typeof hook.onCommitFiberRoot === "function") {
-    const original = hook.onCommitFiberRoot;
-    hook.onCommitFiberRoot = function (...args: unknown[]) {
-      schedule();
-      return original.apply(this, args);
-    };
-    restore = () => {
-      hook.onCommitFiberRoot = original;
-    };
-  }
+  const unsubscribe = subscribeCommits((root) => {
+    if (!isForeignRoot(root)) schedule();
+  });
   const poll = setInterval(schedule, interval);
   return () => {
     clearInterval(poll);
     if (timer) clearTimeout(timer);
-    restore?.();
+    unsubscribe();
   };
 }

@@ -46,7 +46,7 @@ var import_node_url = require("url");
 
 // src/config/server.ts
 var import_node_http = __toESM(require("http"), 1);
-var import_node_fs6 = __toESM(require("fs"), 1);
+var import_node_fs7 = __toESM(require("fs"), 1);
 var import_node_os2 = __toESM(require("os"), 1);
 var import_node_path8 = __toESM(require("path"), 1);
 var import_node_crypto = __toESM(require("crypto"), 1);
@@ -700,6 +700,95 @@ function getConfigSnapshot(root) {
 var import_node_child_process = require("child_process");
 var import_node_https2 = __toESM(require("https"), 1);
 var import_node_path7 = __toESM(require("path"), 1);
+
+// src/config/component-range.ts
+var import_node_fs6 = __toESM(require("fs"), 1);
+var import_parser = require("@babel/parser");
+function pluginsFor(file) {
+  return /\.tsx?$/.test(file) ? ["jsx", "typescript", "decorators-legacy"] : ["jsx", "flow", "decorators-legacy"];
+}
+var isComponentName = (n) => !!n && /^[A-Z]/.test(n);
+function unwrapCall(node) {
+  var _a;
+  let n = node;
+  for (let i = 0; i < 4 && (n == null ? void 0 : n.type) === "CallExpression"; i++) {
+    const fn = (_a = n.arguments) == null ? void 0 : _a.find((a) => /Function|ArrowFunction|CallExpression/.test(a == null ? void 0 : a.type));
+    if (!fn) return null;
+    n = fn;
+  }
+  return n && /FunctionExpression|ArrowFunctionExpression/.test(n.type) ? n : null;
+}
+function findComponentCandidates(code, file) {
+  let ast;
+  try {
+    ast = (0, import_parser.parse)(code, { sourceType: "unambiguous", plugins: pluginsFor(file), errorRecovery: true });
+  } catch {
+    return [];
+  }
+  const out = [];
+  const add = (name, node, depth, isDefault = false) => {
+    if (!(node == null ? void 0 : node.loc)) return;
+    out.push({ name, start: node.loc.start.line, end: node.loc.end.line, depth, isDefault });
+  };
+  const visit = (node, depth, parentDefault = false) => {
+    var _a, _b, _c;
+    if (!node || typeof node.type !== "string") return;
+    switch (node.type) {
+      case "ExportDefaultDeclaration": {
+        const d = node.declaration;
+        if ((d == null ? void 0 : d.type) === "FunctionDeclaration" || (d == null ? void 0 : d.type) === "ClassDeclaration") add((_a = d.id) == null ? void 0 : _a.name, node, depth, true);
+        else if (/FunctionExpression|ArrowFunctionExpression/.test(d == null ? void 0 : d.type) || unwrapCall(d)) add(void 0, node, depth, true);
+        break;
+      }
+      case "FunctionDeclaration":
+      case "ClassDeclaration":
+        if (!parentDefault) add((_b = node.id) == null ? void 0 : _b.name, node, depth);
+        break;
+      case "VariableDeclarator": {
+        const init = node.init;
+        if (init && (/FunctionExpression|ArrowFunctionExpression|ClassExpression/.test(init.type) || unwrapCall(init))) {
+          add((_c = node.id) == null ? void 0 : _c.name, node, depth);
+        }
+        break;
+      }
+    }
+    for (const key in node) {
+      if (key === "loc" || key === "leadingComments" || key === "trailingComments" || key === "extra") continue;
+      const child = node[key];
+      const isDefault = node.type === "ExportDefaultDeclaration";
+      if (Array.isArray(child)) child.forEach((c) => c && typeof c === "object" && visit(c, depth + 1, isDefault));
+      else if (child && typeof child === "object" && typeof child.type === "string") visit(child, depth + 1, isDefault);
+    }
+  };
+  visit(ast.program, 0);
+  return out;
+}
+function pickComponentRange(candidates, line, name) {
+  const contains = (c) => line != null && c.start <= line && line <= c.end;
+  const byName = name ? candidates.filter((c) => c.name === name) : [];
+  if (byName.length) {
+    const hit = byName.find(contains) ?? byName[0];
+    return { name: hit.name, start: hit.start, end: hit.end };
+  }
+  if (line != null) {
+    const around = candidates.filter(contains);
+    const pick = [...around].sort((a, b) => b.depth - a.depth).find((c) => isComponentName(c.name) || c.isDefault) ?? around.sort((a, b) => b.depth - a.depth)[0];
+    if (pick) return { name: pick.name ?? name, start: pick.start, end: pick.end };
+  }
+  const def = candidates.find((c) => c.isDefault);
+  return def ? { name: def.name ?? name, start: def.start, end: def.end } : void 0;
+}
+function componentRange(abs, line, name) {
+  let code;
+  try {
+    code = import_node_fs6.default.readFileSync(abs, "utf8");
+  } catch {
+    return void 0;
+  }
+  return pickComponentRange(findComponentCandidates(code, abs), line, name);
+}
+
+// src/config/git.ts
 var SEP = "";
 var CACHE_TTL = 15e3;
 var cache = /* @__PURE__ */ new Map();
@@ -773,6 +862,31 @@ function parseBlame(out) {
     subject: get("summary")
   };
 }
+function parseBlameRange(out) {
+  const bySha = /* @__PURE__ */ new Map();
+  let current;
+  for (const line of out.split("\n")) {
+    const head = line.match(/^([0-9a-f]{40}) \d+ \d+/);
+    if (head) {
+      current = bySha.get(head[1]);
+      if (!current) {
+        current = { sha: head[1], authorName: "", authorEmail: "", time: 0, subject: "", lines: 0 };
+        bySha.set(head[1], current);
+      }
+      current.lines++;
+      continue;
+    }
+    if (!current || line.startsWith("	")) continue;
+    const sp = line.indexOf(" ");
+    const key = sp === -1 ? line : line.slice(0, sp);
+    const val = sp === -1 ? "" : line.slice(sp + 1);
+    if (key === "author") current.authorName = val;
+    else if (key === "author-mail") current.authorEmail = val.replace(/^<|>$/g, "");
+    else if (key === "author-time") current.time = Number(val) || 0;
+    else if (key === "summary") current.subject = val;
+  }
+  return [...bySha.values()];
+}
 function githubAuthor(remote, sha) {
   if (remote.provider !== "github" || remote.host !== "github.com") return Promise.resolve(null);
   const key = `${remote.path}@${sha}`;
@@ -831,7 +945,7 @@ async function enrich(c, remote, branch, lookup) {
   commit.authorUrl = uncommitted ? void 0 : authorUrl(remote, commit, branch);
   return commit;
 }
-async function load(root, abs, line, lookup) {
+async function load(root, abs, line, name, lookup) {
   const dir = import_node_path7.default.dirname(abs);
   let top;
   try {
@@ -840,12 +954,14 @@ async function load(root, abs, line, lookup) {
     const missing = e.code === "ENOENT";
     return { available: false, reason: missing ? "git isn't installed or not on PATH" : "Not inside a git repository" };
   }
-  const [remoteUrl, branch, status, log, blame] = await Promise.all([
+  const range = componentRange(abs, line, name);
+  const [remoteUrl, branch, status, log, blame, rangeBlame] = await Promise.all([
     git(top, ["remote", "get-url", "origin"]).catch(() => ""),
     git(top, ["rev-parse", "--abbrev-ref", "HEAD"]).then((s) => s.trim()).catch(() => void 0),
     git(top, ["status", "--porcelain", "--", abs]).catch(() => ""),
     git(top, ["log", "-1", `--format=%H${SEP}%an${SEP}%ae${SEP}%aI${SEP}%s`, "--", abs]).catch(() => ""),
-    line ? git(top, ["blame", "-L", `${line},${line}`, "--porcelain", "--", abs]).catch(() => "") : Promise.resolve("")
+    line ? git(top, ["blame", "-L", `${line},${line}`, "--porcelain", "--", abs]).catch(() => "") : Promise.resolve(""),
+    range ? git(top, ["blame", "-L", `${range.start},${range.end}`, "--porcelain", "--", abs]).catch(() => "") : Promise.resolve("")
   ]);
   const remote = parseRemote(remoteUrl);
   const st = status.trim().slice(0, 2);
@@ -858,13 +974,48 @@ async function load(root, abs, line, lookup) {
   let lineCommit;
   const b = blame ? parseBlame(blame) : void 0;
   if (b) lineCommit = await enrich(b, remote, branch, lookup);
-  return { available: true, branch, remote, state, file, line: lineCommit, lineNumber: line, path: import_node_path7.default.relative(top, abs).split(import_node_path7.default.sep).join("/") };
+  let component;
+  if (range) {
+    const entries = parseBlameRange(rangeBlame);
+    const committed = entries.filter((e) => !/^0+$/.test(e.sha));
+    const newest = committed.sort((a, b2) => b2.time - a.time)[0];
+    const authors = /* @__PURE__ */ new Map();
+    for (const e of committed) {
+      const a = authors.get(e.authorEmail) ?? { name: e.authorName, email: e.authorEmail, lines: 0 };
+      a.lines += e.lines;
+      authors.set(e.authorEmail, a);
+    }
+    component = {
+      name: range.name,
+      start: range.start,
+      end: range.end,
+      uncommittedLines: entries.filter((e) => /^0+$/.test(e.sha)).reduce((n, e) => n + e.lines, 0),
+      authors: [...authors.values()].sort((a, b2) => b2.lines - a.lines),
+      commit: newest ? await enrich(
+        { sha: newest.sha, authorName: newest.authorName, authorEmail: newest.authorEmail, date: new Date(newest.time * 1e3).toISOString(), subject: newest.subject },
+        remote,
+        branch,
+        lookup
+      ) : void 0
+    };
+  }
+  return {
+    available: true,
+    branch,
+    remote,
+    state,
+    file,
+    line: lineCommit,
+    lineNumber: line,
+    component,
+    path: import_node_path7.default.relative(top, abs).split(import_node_path7.default.sep).join("/")
+  };
 }
-function getGitInfo(root, abs, line, lookup = true) {
-  const key = `${abs}:${line ?? ""}:${lookup ? 1 : 0}`;
+function getGitInfo(root, abs, line, lookup = true, name) {
+  const key = `${abs}:${line ?? ""}:${name ?? ""}:${lookup ? 1 : 0}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL) return hit.value;
-  const value = load(root, abs, line, lookup).catch((e) => ({ available: false, reason: String((e == null ? void 0 : e.message) || e) }));
+  const value = load(root, abs, line, name, lookup).catch((e) => ({ available: false, reason: String((e == null ? void 0 : e.message) || e) }));
   cache.set(key, { at: Date.now(), value });
   return value;
 }
@@ -878,19 +1029,19 @@ function getOrCreateToken(root) {
   ];
   for (const dir of dirs) {
     try {
-      import_node_fs6.default.mkdirSync(dir, { recursive: true });
+      import_node_fs7.default.mkdirSync(dir, { recursive: true });
       const file = import_node_path8.default.join(dir, "token");
       try {
-        const existing = import_node_fs6.default.readFileSync(file, "utf8").trim();
+        const existing = import_node_fs7.default.readFileSync(file, "utf8").trim();
         if (existing) return existing;
       } catch {
       }
       const token = import_node_crypto.default.randomBytes(24).toString("hex");
       try {
-        import_node_fs6.default.writeFileSync(file, token, { flag: "wx", mode: 384 });
+        import_node_fs7.default.writeFileSync(file, token, { flag: "wx", mode: 384 });
         return token;
       } catch {
-        const raced = import_node_fs6.default.readFileSync(file, "utf8").trim();
+        const raced = import_node_fs7.default.readFileSync(file, "utf8").trim();
         if (raced) return raced;
       }
     } catch {
@@ -959,7 +1110,7 @@ function startDevtoolsServer(opts) {
           if (req2.method !== "POST") return send(res, 405, { error: "POST only" });
           const body = await readBody(req2);
           const abs = resolveInsideRoot(opts.root, body.file);
-          if (!abs || !import_node_fs6.default.existsSync(abs)) return send(res, 404, { error: "file not found in project" });
+          if (!abs || !import_node_fs7.default.existsSync(abs)) return send(res, 404, { error: "file not found in project" });
           const line = Math.max(1, Number(body.line) || 1);
           const column = Math.max(1, Number(body.column) || 1);
           return send(res, 200, await openInEditor(abs, line, column, opts.editor));
@@ -972,9 +1123,10 @@ function startDevtoolsServer(opts) {
           return send(res, 200, await listPackages(opts.root, url.searchParams.get("latest") === "1"));
         case "/git": {
           const abs = resolveInsideRoot(opts.root, url.searchParams.get("file") || "");
-          if (!abs || !import_node_fs6.default.existsSync(abs)) return send(res, 404, { error: "file not found in project" });
+          if (!abs || !import_node_fs7.default.existsSync(abs)) return send(res, 404, { error: "file not found in project" });
           const line = Number(url.searchParams.get("line")) || void 0;
-          return send(res, 200, await getGitInfo(opts.root, abs, line, url.searchParams.get("lookup") !== "0"));
+          const name = url.searchParams.get("name") || void 0;
+          return send(res, 200, await getGitInfo(opts.root, abs, line, url.searchParams.get("lookup") !== "0", name));
         }
         case "/config":
           return send(res, 200, getConfigSnapshot(opts.root));

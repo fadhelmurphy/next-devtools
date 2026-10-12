@@ -67,9 +67,9 @@ export const api = {
   packages: (fresh?: boolean) => cached<PackageEntry[]>("packages", () => request("/packages"), fresh),
   packagesLatest: (fresh?: boolean) => cached<PackageEntry[]>("packages-latest", () => request("/packages?latest=1"), fresh),
   config: (fresh?: boolean) => cached<ConfigSnapshot>("config", () => request("/config"), fresh),
-  git: (file: string, line?: number, lookup = true) => {
-    const key = `git:${file}:${line ?? ""}:${lookup ? 1 : 0}`;
-    const q = new URLSearchParams({ file, ...(line ? { line: String(line) } : {}), ...(lookup ? {} : { lookup: "0" }) });
+  git: (file: string, line?: number, lookup = true, name?: string) => {
+    const key = `git:${file}:${line ?? ""}:${name ?? ""}:${lookup ? 1 : 0}`;
+    const q = new URLSearchParams({ file, ...(line ? { line: String(line) } : {}), ...(name ? { name } : {}), ...(lookup ? {} : { lookup: "0" }) });
     // re-ask after 15s so new commits show up without a reload
     const hit = gitTimes.get(key);
     const fresh = !hit || Date.now() - hit > 15_000;

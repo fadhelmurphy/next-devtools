@@ -14,6 +14,7 @@ import {
   IconPackages,
   IconPayload,
   IconPerformance,
+  IconRenders,
   IconRoutes,
   IconSettings,
   IconSun,
@@ -26,6 +27,7 @@ import { Config } from "./tabs/Config.js";
 import { Network } from "./tabs/Network.js";
 import { Packages } from "./tabs/Packages.js";
 import { Payload } from "./tabs/Payload.js";
+import { Renders } from "./tabs/Renders.js";
 import { Components } from "./tabs/Components.js";
 import { Overview } from "./tabs/Overview.js";
 import { Performance } from "./tabs/Performance.js";
@@ -42,6 +44,7 @@ const TABS: TabDef[] = [
   { id: "packages", label: "Packages", icon: IconPackages, render: () => <Packages /> },
   { id: "config", label: "Config", icon: IconConfig, render: () => <Config /> },
   { id: "payload", label: "Payload", icon: IconPayload, render: () => <Payload /> },
+  { id: "renders", label: "Renders", icon: IconRenders, render: () => <Renders /> },
   { id: "network", label: "Network", icon: IconNetwork, render: () => <Network />, flush: true },
   { id: "performance", label: "Performance", icon: IconPerformance, render: () => <Performance /> },
 ];
@@ -84,6 +87,7 @@ export function App() {
   const [picking, setPicking] = useState<InspectorMode | null>(null);
   const [toastMsg, setToast] = useState<string | null>(null);
   const [pendingReveal, setPendingReveal] = useState<Element | null>(null);
+  const [pendingSelect, setPendingSelect] = useState<number | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const open = settings.open;
@@ -178,6 +182,12 @@ export function App() {
     setTab,
     startPick: () => pick("select"),
     picking: picking === "select",
+    selectComponent: (id) => {
+      setPendingSelect(id);
+      setTab("components");
+    },
+    pendingSelect,
+    clearSelect: useCallback(() => setPendingSelect(null), []),
   };
 
   const theme = settings.theme === "system" ? (prefersLight ? "light" : "dark") : settings.theme;

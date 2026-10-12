@@ -158,7 +158,7 @@ export function ProjectComponents({ mode }: { mode: ReactNode }) {
               </table>
               <div className="nd-section">
                 <h3 style={{ fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }}>Git</h3>
-                <GitCard file={sel.file} />
+                <GitCard file={sel.file} name={sel.names[0]} />
               </div>
               <div className="nd-section">
                 <h3 style={{ fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }}>Imported by {sel.usedBy.length} {sel.usedBy.length === 1 ? "file" : "files"}</h3>

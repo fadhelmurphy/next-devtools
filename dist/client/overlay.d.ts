@@ -12,8 +12,15 @@ export interface HighlightLabel {
         when: string;
         uncommitted?: boolean;
     };
+    /** Browser render time of the owning client component */
+    render?: {
+        last: number;
+        renders: number;
+    };
 }
 export declare function highlight(elements: Element[], label?: HighlightLabel): void;
+/** Briefly outline elements that just re-rendered ("Highlight renders"). */
+export declare function flashElements(elements: Element[], ms: number): void;
 export declare function hideHighlight(): void;
 export type InspectorMode = "editor" | "select";
 export interface PickResult {

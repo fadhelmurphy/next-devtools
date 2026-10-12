@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import https from "node:https";
 import path from "node:path";
 import type { GitCommit, GitInfo, GitRemote } from "../shared/types";
+import { componentRange } from "./component-range";
 
 const SEP = "\x1f";
 const CACHE_TTL = 15_000;
@@ -83,6 +84,43 @@ export function parseBlame(out: string): { sha: string; authorName: string; auth
   };
 }
 
+export interface BlameEntry {
+  sha: string;
+  authorName: string;
+  authorEmail: string;
+  /** seconds since epoch */
+  time: number;
+  subject: string;
+  lines: number;
+}
+
+/** Parse `git blame --porcelain` over a range: one entry per commit with how many lines it owns. */
+export function parseBlameRange(out: string): BlameEntry[] {
+  const bySha = new Map<string, BlameEntry>();
+  let current: BlameEntry | undefined;
+  for (const line of out.split("\n")) {
+    const head = line.match(/^([0-9a-f]{40}) \d+ \d+/);
+    if (head) {
+      current = bySha.get(head[1]);
+      if (!current) {
+        current = { sha: head[1], authorName: "", authorEmail: "", time: 0, subject: "", lines: 0 };
+        bySha.set(head[1], current);
+      }
+      current.lines++;
+      continue;
+    }
+    if (!current || line.startsWith("\t")) continue;
+    const sp = line.indexOf(" ");
+    const key = sp === -1 ? line : line.slice(0, sp);
+    const val = sp === -1 ? "" : line.slice(sp + 1);
+    if (key === "author") current.authorName = val;
+    else if (key === "author-mail") current.authorEmail = val.replace(/^<|>$/g, "");
+    else if (key === "author-time") current.time = Number(val) || 0;
+    else if (key === "summary") current.subject = val;
+  }
+  return [...bySha.values()];
+}
+
 /** Ask GitHub which account made a commit (public repos without a token; GITHUB_TOKEN for private ones). */
 function githubAuthor(remote: GitRemote, sha: string): Promise<{ login?: string; avatar?: string } | null> {
   if (remote.provider !== "github" || remote.host !== "github.com") return Promise.resolve(null);
@@ -148,7 +186,7 @@ async function enrich(c: Omit<GitCommit, "url" | "authorUrl" | "shortSha">, remo
   return commit;
 }
 
-async function load(root: string, abs: string, line: number | undefined, lookup: boolean): Promise<GitInfo> {
+async function load(root: string, abs: string, line: number | undefined, name: string | undefined, lookup: boolean): Promise<GitInfo> {
   const dir = path.dirname(abs);
   let top: string;
   try {
@@ -158,12 +196,14 @@ async function load(root: string, abs: string, line: number | undefined, lookup:
     return { available: false, reason: missing ? "git isn't installed or not on PATH" : "Not inside a git repository" };
   }
 
-  const [remoteUrl, branch, status, log, blame] = await Promise.all([
+  const range = componentRange(abs, line, name);
+  const [remoteUrl, branch, status, log, blame, rangeBlame] = await Promise.all([
     git(top, ["remote", "get-url", "origin"]).catch(() => ""),
     git(top, ["rev-parse", "--abbrev-ref", "HEAD"]).then((s) => s.trim()).catch(() => undefined),
     git(top, ["status", "--porcelain", "--", abs]).catch(() => ""),
     git(top, ["log", "-1", `--format=%H${SEP}%an${SEP}%ae${SEP}%aI${SEP}%s`, "--", abs]).catch(() => ""),
     line ? git(top, ["blame", "-L", `${line},${line}`, "--porcelain", "--", abs]).catch(() => "") : Promise.resolve(""),
+    range ? git(top, ["blame", "-L", `${range.start},${range.end}`, "--porcelain", "--", abs]).catch(() => "") : Promise.resolve(""),
   ]);
   const remote = parseRemote(remoteUrl);
   const st = status.trim().slice(0, 2);
@@ -178,15 +218,57 @@ async function load(root: string, abs: string, line: number | undefined, lookup:
   const b = blame ? parseBlame(blame) : undefined;
   if (b) lineCommit = await enrich(b, remote, branch, lookup);
 
-  return { available: true, branch, remote, state, file, line: lineCommit, lineNumber: line, path: path.relative(top, abs).split(path.sep).join("/") };
+  let component: GitInfo["component"];
+  if (range) {
+    const entries = parseBlameRange(rangeBlame);
+    const committed = entries.filter((e) => !/^0+$/.test(e.sha));
+    const newest = committed.sort((a, b) => b.time - a.time)[0];
+    const authors = new Map<string, { name: string; email: string; lines: number }>();
+    for (const e of committed) {
+      const a = authors.get(e.authorEmail) ?? { name: e.authorName, email: e.authorEmail, lines: 0 };
+      a.lines += e.lines;
+      authors.set(e.authorEmail, a);
+    }
+    component = {
+      name: range.name,
+      start: range.start,
+      end: range.end,
+      uncommittedLines: entries.filter((e) => /^0+$/.test(e.sha)).reduce((n, e) => n + e.lines, 0),
+      authors: [...authors.values()].sort((a, b) => b.lines - a.lines),
+      commit: newest
+        ? await enrich(
+            { sha: newest.sha, authorName: newest.authorName, authorEmail: newest.authorEmail, date: new Date(newest.time * 1000).toISOString(), subject: newest.subject },
+            remote,
+            branch,
+            lookup,
+          )
+        : undefined,
+    };
+  }
+
+  return {
+    available: true,
+    branch,
+    remote,
+    state,
+    file,
+    line: lineCommit,
+    lineNumber: line,
+    component,
+    path: path.relative(top, abs).split(path.sep).join("/"),
+  };
 }
 
-/** Last commit touching a file, and the commit that last changed one line of it. Cached briefly. */
-export function getGitInfo(root: string, abs: string, line?: number, lookup = true): Promise<GitInfo> {
-  const key = `${abs}:${line ?? ""}:${lookup ? 1 : 0}`;
+/**
+ * Last commit touching a file, the commit that last changed one line, and — for the
+ * component declared around that line (or named `name`) — the newest commit among
+ * all of its lines. Cached briefly.
+ */
+export function getGitInfo(root: string, abs: string, line?: number, lookup = true, name?: string): Promise<GitInfo> {
+  const key = `${abs}:${line ?? ""}:${name ?? ""}:${lookup ? 1 : 0}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL) return hit.value;
-  const value = load(root, abs, line, lookup).catch((e) => ({ available: false, reason: String(e?.message || e) }) as GitInfo);
+  const value = load(root, abs, line, name, lookup).catch((e) => ({ available: false, reason: String(e?.message || e) }) as GitInfo);
   cache.set(key, { at: Date.now(), value });
   return value;
 }

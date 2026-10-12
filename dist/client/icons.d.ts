@@ -20,3 +20,4 @@ export declare const IconPayload: () => import("react").JSX.Element;
 export declare const IconNetwork: () => import("react").JSX.Element;
 export declare const IconMoon: () => import("react").JSX.Element;
 export declare const IconSun: () => import("react").JSX.Element;
+export declare const IconRenders: () => import("react").JSX.Element;

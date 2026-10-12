@@ -43,26 +43,30 @@ function Commit({ c, label }) {
     const who = c.login ? `${c.authorName} (@${c.login})` : c.authorName;
     return (_jsxs("div", { className: "nd-commit", children: [_jsx("div", { className: "nd-commit-label", children: label }), _jsxs("div", { className: "nd-commit-body", children: [_jsx(Avatar, { c: c }), _jsxs("div", { className: "nd-commit-text", children: [_jsxs("div", { className: "nd-commit-who", children: [c.authorUrl ? (_jsx("a", { className: "nd-link", href: c.authorUrl, target: "_blank", rel: "noreferrer", title: c.login ? "Open profile" : `Commits by ${c.authorEmail}`, children: who })) : (_jsx("span", { title: c.authorEmail, children: who })), _jsx("time", { className: "nd-faint", dateTime: c.date, title: fullDate(c.date), children: timeAgo(c.date) })] }), _jsxs("div", { className: "nd-commit-msg", children: [c.url ? (_jsx("a", { className: "nd-commit-sha", href: c.url, target: "_blank", rel: "noreferrer", title: "Open commit", children: c.shortSha })) : (_jsx("code", { className: "nd-commit-sha", children: c.shortSha })), _jsx("span", { children: c.subject })] })] })] })] }));
 }
-/** Last commit for a component's file and line. */
-export function GitCard({ file, line }) {
-    var _a, _b;
+/** Last commit that changed a component (any of its lines), plus the file's last commit. */
+export function GitCard({ file, line, name }) {
+    var _a, _b, _c, _d, _e, _f;
     const [info, setInfo] = useState(null);
     const [error, setError] = useState(null);
     useEffect(() => {
         let alive = true;
         setInfo(null);
         setError(null);
-        api.git(file, line).then((r) => alive && setInfo(r), (e) => alive && setError(e.message));
+        api.git(file, line, true, name).then((r) => alive && setInfo(r), (e) => alive && setError(e.message));
         return () => {
             alive = false;
         };
-    }, [file, line]);
+    }, [file, line, name]);
     if (error)
         return _jsx("span", { className: "nd-faint", children: error });
     if (!info)
         return _jsx("span", { className: "nd-faint", children: "Reading git history\u2026" });
     if (!info.available)
         return _jsx("span", { className: "nd-faint", children: info.reason });
-    const sameCommit = info.line && info.file && info.line.sha === info.file.sha;
-    return (_jsxs("div", { className: "nd-git", children: [info.state !== "clean" && (_jsx("div", { className: "nd-git-state", children: _jsx("span", { className: "nd-badge nd-badge-server", children: info.state === "untracked" ? "Untracked file" : "Uncommitted changes" }) })), info.line && !sameCommit && _jsx(Commit, { c: info.line, label: `Line ${info.lineNumber} last changed` }), info.file ? (_jsx(Commit, { c: info.file, label: sameCommit ? `Last commit (file and line ${info.lineNumber})` : "Last commit to this file" })) : (_jsx("span", { className: "nd-faint", children: "No commits for this file yet." })), info.remote && (info.remote.provider === "github" || info.remote.provider === "gitlab") && (_jsxs("div", { className: "nd-faint nd-git-foot", children: [_jsx("a", { className: "nd-link", href: `${info.remote.web}${info.remote.provider === "gitlab" ? "/-/commits" : "/commits"}/${(_a = info.branch) !== null && _a !== void 0 ? _a : "HEAD"}/${(_b = info.path) !== null && _b !== void 0 ? _b : ""}`, target: "_blank", rel: "noreferrer", children: "File history" }), " ", "on ", info.remote.path, info.branch ? ` (${info.branch})` : ""] }))] }));
+    const comp = info.component;
+    const compName = (_b = (_a = comp === null || comp === void 0 ? void 0 : comp.name) !== null && _a !== void 0 ? _a : name) !== null && _b !== void 0 ? _b : "this component";
+    const sameCommit = (comp === null || comp === void 0 ? void 0 : comp.commit) && info.file && comp.commit.sha === info.file.sha;
+    return (_jsxs("div", { className: "nd-git", children: [(info.state === "untracked" || ((_c = comp === null || comp === void 0 ? void 0 : comp.uncommittedLines) !== null && _c !== void 0 ? _c : 0) > 0) && (_jsx("div", { className: "nd-git-state", children: _jsx("span", { className: "nd-badge nd-badge-server", children: info.state === "untracked"
+                        ? "Untracked file"
+                        : `${comp.uncommittedLines} uncommitted ${comp.uncommittedLines === 1 ? "line" : "lines"} in ${compName}` }) })), (comp === null || comp === void 0 ? void 0 : comp.commit) && (_jsx(Commit, { c: comp.commit, label: `Last change to ${compName} (lines ${comp.start}–${comp.end})` })), comp && !comp.commit && info.state !== "untracked" && _jsxs("span", { className: "nd-faint", children: [compName, " hasn't been committed yet."] }), comp && comp.authors.length > 1 && (_jsxs("div", { className: "nd-git-authors nd-faint", children: ["Written by", " ", comp.authors.slice(0, 3).map((a, i) => (_jsxs("span", { children: [i > 0 ? ", " : "", _jsx("span", { title: a.email, children: a.name }), " (", a.lines, " ", a.lines === 1 ? "line" : "lines", ")"] }, a.email))), comp.authors.length > 3 ? ` and ${comp.authors.length - 3} more` : ""] })), info.file && !sameCommit && _jsx(Commit, { c: info.file, label: comp ? "Last commit to the file" : "Last commit to this file" }), !info.file && info.state !== "untracked" && _jsx("span", { className: "nd-faint", children: "No commits for this file yet." }), info.state === "modified" && !((_d = comp === null || comp === void 0 ? void 0 : comp.uncommittedLines) !== null && _d !== void 0 ? _d : 0) && (_jsxs("span", { className: "nd-faint", children: ["The file has uncommitted changes outside ", compName, "."] })), info.remote && (info.remote.provider === "github" || info.remote.provider === "gitlab") && (_jsxs("div", { className: "nd-faint nd-git-foot", children: [_jsx("a", { className: "nd-link", href: `${info.remote.web}${info.remote.provider === "gitlab" ? "/-/commits" : "/commits"}/${(_e = info.branch) !== null && _e !== void 0 ? _e : "HEAD"}/${(_f = info.path) !== null && _f !== void 0 ? _f : ""}`, target: "_blank", rel: "noreferrer", children: "File history" }), " ", "on ", info.remote.path, info.branch ? ` (${info.branch})` : ""] }))] }));
 }

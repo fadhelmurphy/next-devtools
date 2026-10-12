@@ -15,7 +15,7 @@ export declare const api: {
     packages: (fresh?: boolean) => Promise<PackageEntry[]>;
     packagesLatest: (fresh?: boolean) => Promise<PackageEntry[]>;
     config: (fresh?: boolean) => Promise<ConfigSnapshot>;
-    git: (file: string, line?: number, lookup?: boolean) => Promise<GitInfo>;
+    git: (file: string, line?: number, lookup?: boolean, name?: string) => Promise<GitInfo>;
 };
 export interface SourceLocation {
     file: string;

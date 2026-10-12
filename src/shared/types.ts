@@ -139,6 +139,17 @@ export interface GitInfo {
   /** Last commit that changed `lineNumber` */
   line?: GitCommit;
   lineNumber?: number;
+  /** The component declared around `lineNumber` (or by name): newest commit across all its lines */
+  component?: {
+    name?: string;
+    start: number;
+    end: number;
+    commit?: GitCommit;
+    /** Lines in the component not committed yet */
+    uncommittedLines: number;
+    /** Who wrote the current lines, most lines first */
+    authors: { name: string; email: string; lines: number }[];
+  };
   /** File path relative to the repository root */
   path?: string;
 }

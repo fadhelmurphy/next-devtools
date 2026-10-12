@@ -1,6 +1,7 @@
 import { SOURCE_ATTR } from "../shared/types.js";
 import { api, parseSource } from "./api.js";
 import { timeAgo } from "./GitCard.js";
+import { formatMs, severity, statFor } from "./profiler.js";
 import { HOST_ID, ownerOfElement } from "./fiber.js";
 /* Highlight box + tooltip drawn inside our shadow root. Plain DOM on purpose:
    pointermove fires constantly and must not re-render React. */
@@ -56,7 +57,8 @@ export function highlight(elements, label) {
       ${label.tag ? `<span class="nd-tip-tag">&lt;${esc(label.tag)}&gt;</span>` : ""}
     </div>
     ${label.source ? `<div class="nd-tip-src">${esc(label.source.file)}:${label.source.line}</div>` : ""}
-    ${label.git ? `<div class="nd-tip-git">${label.git.uncommitted ? "Line not committed yet" : `Last changed by <b>${esc(label.git.author)}</b> ${esc(label.git.when)}`}</div>` : ""}
+    ${label.render ? `<div class="nd-tip-git">Rendered ${label.render.renders}×, last <b class="nd-sev-${severity(label.render.last)}">${formatMs(label.render.last)}</b></div>` : ""}
+    ${label.git ? `<div class="nd-tip-git">${label.git.uncommitted ? "Not committed yet" : `Last changed by <b>${esc(label.git.author)}</b> ${esc(label.git.when)}`}</div>` : ""}
     <div class="nd-tip-foot"><span>${Math.round(rect.width)} × ${Math.round(rect.height)}</span>${label.hint ? `<span>${esc(label.hint)}</span>` : ""}</div>`;
     tip.style.display = "block";
     // Below the box if there's room, otherwise above; clamp horizontally.
@@ -68,6 +70,24 @@ export function highlight(elements, label) {
         top = Math.min(window.innerHeight - th - 4, Math.max(4, rect.top + 6));
     const left = Math.min(Math.max(4, rect.left), window.innerWidth - tw - 4);
     tip.style.transform = `translate(${left}px, ${top}px)`;
+}
+/** Briefly outline elements that just re-rendered ("Highlight renders"). */
+export function flashElements(elements, ms) {
+    if (!layer)
+        return;
+    for (const el of elements) {
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height || r.bottom < 0 || r.top > window.innerHeight)
+            continue;
+        const d = document.createElement("div");
+        d.className = "nd-flash";
+        d.style.transform = `translate(${r.left}px, ${r.top}px)`;
+        d.style.width = `${r.width}px`;
+        d.style.height = `${r.height}px`;
+        d.style.animationDuration = `${ms}ms`;
+        layer.appendChild(d);
+        setTimeout(() => d.remove(), ms);
+    }
 }
 export function hideHighlight() {
     if (box)
@@ -88,11 +108,13 @@ export function describe(el) {
     const tagged = el.closest(`[${SOURCE_ATTR}]`);
     const source = parseSource(tagged === null || tagged === void 0 ? void 0 : tagged.getAttribute(SOURCE_ATTR));
     const owner = ownerOfElement(el);
+    const stat = owner && !owner.server ? statFor(owner.owner) : undefined;
     return {
         title: (_a = owner === null || owner === void 0 ? void 0 : owner.name) !== null && _a !== void 0 ? _a : el.tagName.toLowerCase(),
         server: owner === null || owner === void 0 ? void 0 : owner.server,
         tag: el.tagName.toLowerCase(),
         source,
+        render: stat ? { last: stat.lastSelf, renders: stat.renders } : undefined,
     };
 }
 const onMove = (e) => {
@@ -113,10 +135,10 @@ const onMove = (e) => {
     // Wait for the pointer to settle, then blame the element's line (local git only, no network).
     gitTimer = setTimeout(() => {
         api
-            .git(src.file, src.line, false)
+            .git(src.file, src.line, false, d.title)
             .then((info) => {
-            var _a;
-            const c = (_a = info.line) !== null && _a !== void 0 ? _a : info.file;
+            var _a, _b, _c;
+            const c = (_c = (_b = (_a = info.component) === null || _a === void 0 ? void 0 : _a.commit) !== null && _b !== void 0 ? _b : info.line) !== null && _c !== void 0 ? _c : info.file;
             if (!active || last !== el || !info.available || !c)
                 return;
             highlight([el], Object.assign(Object.assign({}, label), { git: { author: c.authorName, when: timeAgo(c.date), uncommitted: c.uncommitted } }));

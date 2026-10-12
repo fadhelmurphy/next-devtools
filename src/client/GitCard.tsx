@@ -88,40 +88,61 @@ function Commit({ c, label }: { c: GitCommit; label: string }) {
   );
 }
 
-/** Last commit for a component's file and line. */
-export function GitCard({ file, line }: { file: string; line?: number }) {
+/** Last commit that changed a component (any of its lines), plus the file's last commit. */
+export function GitCard({ file, line, name }: { file: string; line?: number; name?: string }) {
   const [info, setInfo] = useState<GitInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
     setInfo(null);
     setError(null);
-    api.git(file, line).then(
+    api.git(file, line, true, name).then(
       (r) => alive && setInfo(r),
       (e) => alive && setError((e as Error).message),
     );
     return () => {
       alive = false;
     };
-  }, [file, line]);
+  }, [file, line, name]);
 
   if (error) return <span className="nd-faint">{error}</span>;
   if (!info) return <span className="nd-faint">Reading git history…</span>;
   if (!info.available) return <span className="nd-faint">{info.reason}</span>;
-  const sameCommit = info.line && info.file && info.line.sha === info.file.sha;
+  const comp = info.component;
+  const compName = comp?.name ?? name ?? "this component";
+  const sameCommit = comp?.commit && info.file && comp.commit.sha === info.file.sha;
 
   return (
     <div className="nd-git">
-      {info.state !== "clean" && (
+      {(info.state === "untracked" || (comp?.uncommittedLines ?? 0) > 0) && (
         <div className="nd-git-state">
-          <span className="nd-badge nd-badge-server">{info.state === "untracked" ? "Untracked file" : "Uncommitted changes"}</span>
+          <span className="nd-badge nd-badge-server">
+            {info.state === "untracked"
+              ? "Untracked file"
+              : `${comp!.uncommittedLines} uncommitted ${comp!.uncommittedLines === 1 ? "line" : "lines"} in ${compName}`}
+          </span>
         </div>
       )}
-      {info.line && !sameCommit && <Commit c={info.line} label={`Line ${info.lineNumber} last changed`} />}
-      {info.file ? (
-        <Commit c={info.file} label={sameCommit ? `Last commit (file and line ${info.lineNumber})` : "Last commit to this file"} />
-      ) : (
-        <span className="nd-faint">No commits for this file yet.</span>
+      {comp?.commit && (
+        <Commit c={comp.commit} label={`Last change to ${compName} (lines ${comp.start}–${comp.end})`} />
+      )}
+      {comp && !comp.commit && info.state !== "untracked" && <span className="nd-faint">{compName} hasn't been committed yet.</span>}
+      {comp && comp.authors.length > 1 && (
+        <div className="nd-git-authors nd-faint">
+          Written by{" "}
+          {comp.authors.slice(0, 3).map((a, i) => (
+            <span key={a.email}>
+              {i > 0 ? ", " : ""}
+              <span title={a.email}>{a.name}</span> ({a.lines} {a.lines === 1 ? "line" : "lines"})
+            </span>
+          ))}
+          {comp.authors.length > 3 ? ` and ${comp.authors.length - 3} more` : ""}
+        </div>
+      )}
+      {info.file && !sameCommit && <Commit c={info.file} label={comp ? "Last commit to the file" : "Last commit to this file"} />}
+      {!info.file && info.state !== "untracked" && <span className="nd-faint">No commits for this file yet.</span>}
+      {info.state === "modified" && !(comp?.uncommittedLines ?? 0) && (
+        <span className="nd-faint">The file has uncommitted changes outside {compName}.</span>
       )}
       {info.remote && (info.remote.provider === "github" || info.remote.provider === "gitlab") && (
         <div className="nd-faint nd-git-foot">

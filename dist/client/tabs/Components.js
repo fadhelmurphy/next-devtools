@@ -5,11 +5,13 @@ import { buildTree, getFiberFromNode, idOf, isComponentFiber, nodeElements, onCo
 import { IconChevron, IconInspect, IconOpen, IconRefresh } from "../icons.js";
 import { ProjectComponents } from "./ProjectComponents.js";
 import { GitCard } from "../GitCard.js";
+import { RenderBadge, RenderInfo, useProfileVersion } from "../RenderInfo.js";
 import { hideHighlight, highlight } from "../overlay.js";
 import { updateSettings } from "../settings.js";
 const MAX_ROWS = 4000;
 function RuntimeTree({ mode }) {
-    const { pendingReveal, clearReveal, startPick, picking, open, toast } = useDevtools();
+    const { pendingReveal, clearReveal, startPick, picking, open, toast, pendingSelect, clearSelect } = useDevtools();
+    useProfileVersion(); // live render-time badges
     const { hideInternals } = useSettings();
     const [tree, setTree] = useState([]);
     const [selected, setSelected] = useState(null);
@@ -63,6 +65,24 @@ function RuntimeTree({ mode }) {
         });
         requestAnimationFrame(() => { var _a; return (_a = rowRefs.current.get(found.node.id)) === null || _a === void 0 ? void 0 : _a.scrollIntoView({ block: "center" }); });
     }, [pendingReveal, tree, index, clearReveal, toast]);
+    // Select a component by id (from the Renders tab)
+    useEffect(() => {
+        if (pendingSelect == null || !tree.length)
+            return;
+        const found = index.get(pendingSelect);
+        clearSelect();
+        if (!found) {
+            toast("That component isn't on the page anymore.");
+            return;
+        }
+        setSelected(found.node.id);
+        setCollapsed((c) => {
+            const next = new Set(c);
+            found.parents.forEach((p) => next.delete(p.id));
+            return next;
+        });
+        requestAnimationFrame(() => { var _a; return (_a = rowRefs.current.get(found.node.id)) === null || _a === void 0 ? void 0 : _a.scrollIntoView({ block: "center" }); });
+    }, [pendingSelect, tree, index, clearSelect, toast]);
     // Flatten for rendering; search keeps matches and their ancestors.
     const { rows, matches } = useMemo(() => {
         const needle = q.trim().toLowerCase();
@@ -132,7 +152,7 @@ function RuntimeTree({ mode }) {
                                 }, role: "treeitem", "aria-selected": node.id === selected, "aria-expanded": node.children.length ? !collapsed.has(node.id) : undefined, "data-kind": node.kind, className: `nd-tree-row${matches.has(node.id) ? " nd-tree-match" : ""}`, style: { paddingLeft: 8 + depth * 14 }, onClick: () => setSelected(node.id), onDoubleClick: () => open(sourceOfNode(node)), title: "Double-click to open in editor", onMouseEnter: () => highlight(nodeElements(node), { title: node.name, server: node.kind === "server" }), children: [node.children.length ? (_jsx("button", { className: "nd-tree-toggle", "aria-expanded": !collapsed.has(node.id), "aria-label": collapsed.has(node.id) ? "Expand" : "Collapse", onClick: (e) => {
                                             e.stopPropagation();
                                             toggle(node.id);
-                                        }, children: _jsx(IconChevron, {}) })) : (_jsx("span", { style: { width: 16, flex: "none" } })), _jsx("span", { className: "nd-tree-name", children: node.name }), node.key != null && _jsxs("span", { className: "nd-tree-key", children: ["key=\"", String(node.key), "\""] }), node.kind === "server" && _jsx("span", { className: "nd-badge nd-badge-server", children: "Server" }), _jsx("button", { className: "nd-row-action", "aria-label": `Open ${node.name} in editor`, title: "Open in editor", onClick: (e) => {
+                                        }, children: _jsx(IconChevron, {}) })) : (_jsx("span", { style: { width: 16, flex: "none" } })), _jsx("span", { className: "nd-tree-name", children: node.name }), node.key != null && _jsxs("span", { className: "nd-tree-key", children: ["key=\"", String(node.key), "\""] }), node.kind === "server" && _jsx("span", { className: "nd-badge nd-badge-server", children: "Server" }), _jsx(RenderBadge, { node: node }), _jsx("button", { className: "nd-row-action", "aria-label": `Open ${node.name} in editor`, title: "Open in editor", onClick: (e) => {
                                             e.stopPropagation();
                                             open(sourceOfNode(node));
                                         }, children: _jsx(IconOpen, {}) })] }, node.id))), rows.length >= MAX_ROWS && _jsxs("div", { className: "nd-faint", style: { padding: "8px 14px" }, children: ["Showing the first ", MAX_ROWS, " components. Use search to narrow down."] })] })] }), _jsx("section", { className: "nd-pane", "aria-label": "Component details", children: _jsx("div", { className: "nd-pane-body", children: sel ? _jsx(Details, { item: sel, onSelect: setSelected }) : _jsx(NoSelection, {}) }) })] }));
@@ -146,7 +166,7 @@ function Details({ item, onSelect }) {
     const props = propsOf(node);
     const state = stateOf(node);
     const elements = nodeElements(node);
-    return (_jsxs("div", { className: "nd-detail", children: [parents.length > 0 && (_jsx("div", { className: "nd-crumbs", style: { marginBottom: 8 }, children: parents.slice(-4).map((p) => (_jsxs("span", { children: [_jsx("button", { onClick: () => onSelect(p.id), children: p.name }), " \u203A"] }, p.id))) })), _jsxs("h3", { children: [node.name, _jsx("span", { className: `nd-badge ${node.kind === "server" ? "nd-badge-server" : "nd-badge-client"}`, children: node.kind === "server" ? `Server${node.env && node.env !== "Server" ? ` (${node.env})` : ""}` : "Client" })] }), _jsxs("div", { style: { marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }, children: [source ? (_jsxs(_Fragment, { children: [_jsxs("button", { className: "nd-btn nd-btn-primary", onClick: () => open(source), children: [_jsx(IconOpen, {}), " Open in editor"] }), _jsx(FileLink, { loc: source })] })) : (_jsx("span", { className: "nd-faint", children: "Source unknown \u2014 it renders no DOM of its own" })), elements.length > 0 && (_jsx("button", { className: "nd-link", onClick: () => elements[0].scrollIntoView({ block: "center", behavior: "smooth" }), children: "Scroll to" }))] }), source && (_jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "Git" }), _jsx(GitCard, { file: source.file, line: source.line })] })), _jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "Props" }), Object.keys(props).length ? (_jsx("table", { className: "nd-props", children: _jsx("tbody", { children: Object.entries(props).map(([k, v]) => (_jsxs("tr", { children: [_jsx("td", { children: k }), _jsx("td", { children: preview(v) })] }, k))) }) })) : (_jsx("span", { className: "nd-faint", children: node.kind === "server" && !((_a = node.info) === null || _a === void 0 ? void 0 : _a.props) ? "Not available for this React version" : "None" }))] }), node.kind === "client" && (_jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "State" }), state.length ? (_jsx("table", { className: "nd-props", children: _jsx("tbody", { children: state.map((v, i) => (_jsxs("tr", { children: [_jsx("td", { children: state.length === 1 && node.fibers[0].tag === 1 ? "this.state" : `state ${i + 1}` }), _jsx("td", { children: preview(v) })] }, i))) }) })) : (_jsx("span", { className: "nd-faint", children: "Stateless" }))] })), _jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "Renders" }), _jsxs("span", { className: "nd-muted", children: [elements.length, " DOM ", elements.length === 1 ? "element" : "elements", node.children.length ? `, ${node.children.length} child ${node.children.length === 1 ? "component" : "components"}` : ""] })] })] }));
+    return (_jsxs("div", { className: "nd-detail", children: [parents.length > 0 && (_jsx("div", { className: "nd-crumbs", style: { marginBottom: 8 }, children: parents.slice(-4).map((p) => (_jsxs("span", { children: [_jsx("button", { onClick: () => onSelect(p.id), children: p.name }), " \u203A"] }, p.id))) })), _jsxs("h3", { children: [node.name, _jsx("span", { className: `nd-badge ${node.kind === "server" ? "nd-badge-server" : "nd-badge-client"}`, children: node.kind === "server" ? `Server${node.env && node.env !== "Server" ? ` (${node.env})` : ""}` : "Client" })] }), _jsxs("div", { style: { marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }, children: [source ? (_jsxs(_Fragment, { children: [_jsxs("button", { className: "nd-btn nd-btn-primary", onClick: () => open(source), children: [_jsx(IconOpen, {}), " Open in editor"] }), _jsx(FileLink, { loc: source })] })) : (_jsx("span", { className: "nd-faint", children: "Source unknown \u2014 it renders no DOM of its own" })), elements.length > 0 && (_jsx("button", { className: "nd-link", onClick: () => elements[0].scrollIntoView({ block: "center", behavior: "smooth" }), children: "Scroll to" }))] }), _jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "Render time" }), _jsx(RenderInfo, { node: node })] }), source && (_jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "Git" }), _jsx(GitCard, { file: source.file, line: source.line, name: node.name })] })), _jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "Props" }), Object.keys(props).length ? (_jsx("table", { className: "nd-props", children: _jsx("tbody", { children: Object.entries(props).map(([k, v]) => (_jsxs("tr", { children: [_jsx("td", { children: k }), _jsx("td", { children: preview(v) })] }, k))) }) })) : (_jsx("span", { className: "nd-faint", children: node.kind === "server" && !((_a = node.info) === null || _a === void 0 ? void 0 : _a.props) ? "Not available for this React version" : "None" }))] }), node.kind === "client" && (_jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "State" }), state.length ? (_jsx("table", { className: "nd-props", children: _jsx("tbody", { children: state.map((v, i) => (_jsxs("tr", { children: [_jsx("td", { children: state.length === 1 && node.fibers[0].tag === 1 ? "this.state" : `state ${i + 1}` }), _jsx("td", { children: preview(v) })] }, i))) }) })) : (_jsx("span", { className: "nd-faint", children: "Stateless" }))] })), _jsxs("div", { className: "nd-section", children: [_jsx("h3", { style: { fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }, children: "Renders" }), _jsxs("span", { className: "nd-muted", children: [elements.length, " DOM ", elements.length === 1 ? "element" : "elements", node.children.length ? `, ${node.children.length} child ${node.children.length === 1 ? "component" : "components"}` : ""] })] })] }));
 }
 export function Components() {
     const [mode, setMode] = useState("page");

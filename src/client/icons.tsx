@@ -148,3 +148,8 @@ export const IconSun = () => (
     <path d="M12 2.5v2M12 19.5v2M21.5 12h-2M4.5 12h-2M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4M18.7 18.7l-1.4-1.4M6.7 6.7 5.3 5.3" />
   </Svg>
 );
+export const IconRenders = () => (
+  <Svg>
+    <path d="M13 3.5 5.5 13.5H12l-1 7 7.5-10H12z" />
+  </Svg>
+);

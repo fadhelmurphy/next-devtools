@@ -28,6 +28,8 @@ export interface TreeNode {
 export interface BuildOptions {
     hideInternals: boolean;
 }
+/** Next's own error overlay is portaled into <nextjs-portal>; never part of "your" tree. */
+export declare function isNextOverlay(f: Fiber): boolean;
 export declare function buildTree(opts: BuildOptions): TreeNode[];
 export declare function walkTree(nodes: TreeNode[], fn: (n: TreeNode, parents: TreeNode[]) => void, parents?: TreeNode[]): void;
 export declare function hostNodesOf(fiber: Fiber, out?: Element[], depth?: number): Element[];
@@ -44,5 +46,11 @@ export declare function preview(value: unknown, depth?: number, seen?: WeakSet<o
 export declare function propsOf(node: TreeNode): Record<string, unknown>;
 /** useState / useReducer values (function components) or this.state (classes). */
 export declare function stateOf(node: TreeNode): unknown[];
-/** Calls `fn` (throttled) after React commits; falls back to polling without the DevTools hook. */
+type CommitListener = (root: any) => void;
+export declare function subscribeCommits(fn: CommitListener): () => void;
+export declare const hasCommitHook: () => boolean;
+/** Is this fiber root one of ours (the DevTools panel) or Next's dev overlay? */
+export declare function isForeignRoot(root: any): boolean;
+/** Calls `fn` (throttled) after the app commits; falls back to polling without the DevTools hook. */
 export declare function onCommit(fn: () => void, interval?: number): () => void;
+export {};

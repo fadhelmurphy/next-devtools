@@ -18,6 +18,7 @@ import {
 import { IconChevron, IconInspect, IconOpen, IconRefresh } from "../icons.js";
 import { ProjectComponents } from "./ProjectComponents.js";
 import { GitCard } from "../GitCard.js";
+import { RenderBadge, RenderInfo, useProfileVersion } from "../RenderInfo.js";
 import { hideHighlight, highlight } from "../overlay.js";
 import { updateSettings } from "../settings.js";
 
@@ -29,7 +30,8 @@ interface Indexed {
 const MAX_ROWS = 4000;
 
 function RuntimeTree({ mode }: { mode: React.ReactNode }) {
-  const { pendingReveal, clearReveal, startPick, picking, open, toast } = useDevtools();
+  const { pendingReveal, clearReveal, startPick, picking, open, toast, pendingSelect, clearSelect } = useDevtools();
+  useProfileVersion(); // live render-time badges
   const { hideInternals } = useSettings();
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
@@ -78,6 +80,24 @@ function RuntimeTree({ mode }: { mode: React.ReactNode }) {
     });
     requestAnimationFrame(() => rowRefs.current.get(found.node.id)?.scrollIntoView({ block: "center" }));
   }, [pendingReveal, tree, index, clearReveal, toast]);
+
+  // Select a component by id (from the Renders tab)
+  useEffect(() => {
+    if (pendingSelect == null || !tree.length) return;
+    const found = index.get(pendingSelect);
+    clearSelect();
+    if (!found) {
+      toast("That component isn't on the page anymore.");
+      return;
+    }
+    setSelected(found.node.id);
+    setCollapsed((c) => {
+      const next = new Set(c);
+      found.parents.forEach((p) => next.delete(p.id));
+      return next;
+    });
+    requestAnimationFrame(() => rowRefs.current.get(found.node.id)?.scrollIntoView({ block: "center" }));
+  }, [pendingSelect, tree, index, clearSelect, toast]);
 
   // Flatten for rendering; search keeps matches and their ancestors.
   const { rows, matches } = useMemo(() => {
@@ -207,6 +227,7 @@ function RuntimeTree({ mode }: { mode: React.ReactNode }) {
               <span className="nd-tree-name">{node.name}</span>
               {node.key != null && <span className="nd-tree-key">key="{String(node.key)}"</span>}
               {node.kind === "server" && <span className="nd-badge nd-badge-server">Server</span>}
+              <RenderBadge node={node} />
               <button
                 className="nd-row-action"
                 aria-label={`Open ${node.name} in editor`}
@@ -281,10 +302,15 @@ function Details({ item, onSelect }: { item: Indexed; onSelect: (id: number) => 
         )}
       </div>
 
+      <div className="nd-section">
+        <h3 style={{ fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }}>Render time</h3>
+        <RenderInfo node={node} />
+      </div>
+
       {source && (
         <div className="nd-section">
           <h3 style={{ fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--muted)" }}>Git</h3>
-          <GitCard file={source.file} line={source.line} />
+          <GitCard file={source.file} line={source.line} name={node.name} />
         </div>
       )}
 

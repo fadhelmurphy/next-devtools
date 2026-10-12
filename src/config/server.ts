@@ -142,7 +142,8 @@ export function startDevtoolsServer(opts: ServerOptions): void {
           if (!abs || !fs.existsSync(abs)) return send(res, 404, { error: "file not found in project" });
           const line = Number(url.searchParams.get("line")) || undefined;
           // lookup=0: skip the GitHub API (used for hover tooltips)
-          return send(res, 200, await getGitInfo(opts.root, abs, line, url.searchParams.get("lookup") !== "0"));
+          const name = url.searchParams.get("name") || undefined;
+          return send(res, 200, await getGitInfo(opts.root, abs, line, url.searchParams.get("lookup") !== "0", name));
         }
         case "/config":
           return send(res, 200, getConfigSnapshot(opts.root));
